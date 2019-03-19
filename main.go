@@ -7,33 +7,128 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"path"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
-	"github.com/kr/pretty"
 	"github.com/nareix/joy4/av/pktque"
 	"github.com/nareix/joy4/format"
 	"github.com/nareix/joy4/format/rtmp"
 	"github.com/nareix/joy4/format/ts"
 )
 
-const numChunks = 5
+const (
+	numChunks = 5
+	assumeKI  = 2 * time.Second
+)
 
 type hlsChunk struct {
-	name   string
-	length time.Duration
-	data   []byte
+	name string
+	// atomic
+	dur   uint32
+	final uint32
+	// locked
+	mu      sync.Mutex
+	buf     []byte
+	readers map[hlsReader]struct{}
+}
+
+type hlsReader chan struct{}
+
+func NewChunk(base string, maxKeyTime time.Duration) *hlsChunk {
+	return &hlsChunk{
+		name:    fmt.Sprintf("%s-%x.ts", base, time.Now().UnixNano()),
+		dur:     uint32(maxKeyTime / time.Millisecond),
+		readers: make(map[hlsReader]struct{}),
+	}
 }
 
 func (c *hlsChunk) Format() string {
-	return fmt.Sprintf("#EXTINF:%.03f,live\n%s\n", float32(c.length)/float32(time.Second), c.name)
+	dur := float32(atomic.LoadUint32(&c.dur)) / 1000
+	return fmt.Sprintf("#EXTINF:%.03f,live\n%s\n", dur, c.name)
+}
+
+func (c *hlsChunk) Final() bool {
+	return atomic.LoadUint32(&c.final) != 0
+}
+
+func (c *hlsChunk) GetFrom(start int) []byte {
+	c.mu.Lock()
+	d := c.buf[start:]
+	c.mu.Unlock()
+	return d
+}
+
+func (c *hlsChunk) Write(d []byte) (int, error) {
+	c.mu.Lock()
+	c.buf = append(c.buf, d...)
+	defer c.mu.Unlock()
+	// wake up readers
+	for readerCh := range c.readers {
+		// non-blocking write
+		select {
+		case readerCh <- struct{}{}:
+		default:
+		}
+	}
+	return len(d), nil
+}
+
+func (c *hlsChunk) Finalize(dur time.Duration) {
+	atomic.StoreUint32(&c.dur, uint32(dur/time.Millisecond))
+	atomic.StoreUint32(&c.final, 1)
+	c.mu.Lock()
+	for readerCh := range c.readers {
+		close(readerCh)
+	}
+	c.readers = nil
+	c.mu.Unlock()
+}
+
+func (c *hlsChunk) WriteTo(ctx context.Context, w io.Writer) error {
+	if c.Final() {
+		_, err := w.Write(c.buf)
+		return err
+	}
+	readerCh := make(hlsReader, 1)
+	c.mu.Lock()
+	c.readers[readerCh] = struct{}{}
+	c.mu.Unlock()
+	defer func() {
+		c.mu.Lock()
+		delete(c.readers, readerCh)
+		c.mu.Unlock()
+	}()
+	var pos int
+	for ctx.Err() == nil {
+		d := c.GetFrom(pos)
+		if len(d) != 0 {
+			if _, err := w.Write(d); err != nil {
+				return err
+			}
+			log.Printf("reader got %d bytes", len(d))
+			pos += len(d)
+		}
+		select {
+		case <-ctx.Done():
+			log.Printf("reader went away")
+			return ctx.Err()
+		case _, ok := <-readerCh:
+			if !ok {
+				// final
+				log.Printf("reader saw EOF")
+				return nil
+			}
+		}
+	}
+	return ctx.Err()
 }
 
 func main() {
@@ -42,8 +137,8 @@ func main() {
 
 	var chunks []*hlsChunk
 	var cmu sync.Mutex
-	var seq int64
-	keyTime := 2 * time.Second
+	var seq uint64
+	var targetDur int
 
 	server.HandlePublish = func(conn *rtmp.Conn) {
 		fm := &pktque.FilterDemuxer{
@@ -55,18 +150,12 @@ func main() {
 			log.Println("error: getting streams from publish to %s: %s", conn.URL, err)
 			return
 		}
-		pretty.Println(streams)
-		m3u, err := os.Create("/tmp/index.m3u8")
-		if err != nil {
-			log.Fatalln("error:", err)
-		}
-		fmt.Fprintln(m3u, "#EXTM3U")
-		fmt.Fprintln(m3u, "#EXT-X-VERSION:3")
-		fmt.Fprintln(m3u, "#EXT-X-TARGETDURATION:2")
-		var chf bytes.Buffer
-		var gotKey bool
-		keyTime := 2 * time.Second
-		var chunkStarts, chunkEnds time.Duration
+		base := path.Base(conn.URL.Path)
+		var chunkEnds time.Duration
+		var chunk *hlsChunk
+		var keyTimes [numChunks]time.Duration
+		var keyNum uint
+		var lastKey time.Duration
 		chm := ts.NewMuxer(nil)
 		for {
 			pkt, err := fm.ReadPacket()
@@ -78,17 +167,31 @@ func main() {
 			}
 			if pkt.IsKeyFrame {
 				log.Printf("keyframe %d %s %s %d", pkt.Idx, pkt.CompositionTime, pkt.Time, len(pkt.Data))
-				newChunk := !gotKey
-				if gotKey && chunkEnds-pkt.Time < 100*time.Millisecond {
-					chm.WriteTrailer()
-					data := make([]byte, chf.Len())
-					copy(data, chf.Bytes())
-					chunk := &hlsChunk{
-						name:   fmt.Sprintf("%s-%x.ts", path.Base(conn.URL.Path), time.Now().UnixNano()),
-						length: chunkEnds - chunkStarts,
-						data:   data,
+				maxKeyTime := assumeKI
+				thisKeyTime := assumeKI
+				if lastKey != 0 {
+					thisKeyTime = pkt.Time - lastKey
+					keyTimes[keyNum] = thisKeyTime
+					keyNum = (keyNum + 1) % numChunks
+					maxKeyTime = 0
+					for _, t := range keyTimes {
+						if t > maxKeyTime {
+							maxKeyTime = t
+						}
 					}
+				}
+				lastKey = pkt.Time
+				if chunk != nil && chunkEnds-pkt.Time < 100*time.Millisecond {
+					chm.WriteTrailer()
 					log.Println("end  ", chunk.name)
+					chunk.Finalize(thisKeyTime)
+					chunk = nil
+				}
+				if chunk == nil {
+					chunk = NewChunk(base, maxKeyTime)
+					chm.SetWriter(chunk)
+					chm.WriteHeader(streams)
+					chunkEnds = pkt.Time + maxKeyTime
 					cmu.Lock()
 					if len(chunks) >= numChunks {
 						copy(chunks, chunks[1:])
@@ -96,29 +199,23 @@ func main() {
 					}
 					chunks = append(chunks, chunk)
 					seq++
+					targetDur = int(maxKeyTime.Round(time.Second) / time.Second)
 					cmu.Unlock()
-					newChunk = true
 				}
-				if newChunk {
-					chf.Reset()
-					chm.SetWriter(&chf)
-					chm.WriteHeader(streams)
-					chunkStarts = pkt.Time
-					chunkEnds = pkt.Time + keyTime
-				}
-				gotKey = true
 			}
-			if gotKey {
+			if chunk != nil {
 				chm.WritePacket(pkt)
 			}
 		}
 	}
 
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
-		if strings.HasSuffix(req.URL.Path, ".m3u8") {
+		if req.URL.Path == "/" {
+			http.ServeFile(w, req, "./index.html")
+		} else if strings.HasSuffix(req.URL.Path, ".m3u8") {
 			var b bytes.Buffer
-			fmt.Fprintf(&b, "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:%d\n", keyTime/time.Second)
 			cmu.Lock()
+			fmt.Fprintf(&b, "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:%d\n", targetDur)
 			fmt.Fprintf(&b, "#EXT-X-MEDIA-SEQUENCE:%d\n", seq)
 			for _, chunk := range chunks {
 				b.WriteString(chunk.Format())
@@ -136,12 +233,16 @@ func main() {
 			}
 			cmu.Unlock()
 			if chunk != nil {
-				w.Write(chunk.data)
+				if err := chunk.WriteTo(req.Context(), w); err != nil {
+					log.Printf("error: writing chunk %s to client %s: %s", chunk.name, req.RemoteAddr, err)
+				}
 			} else {
 				http.NotFound(w, req)
 			}
 		}
 	})
+
+	http.Handle("/node_modules/", http.FileServer(http.Dir(".")))
 
 	go http.ListenAndServe(":8009", nil)
 

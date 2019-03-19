@@ -1,2 +1,3 @@
 *.log
 *.ts
+node_modules
