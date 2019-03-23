@@ -21,6 +21,12 @@ new Vue({
   render: h => h(App),
   data: {
     channels: null,
+    user: {
+      id: null,
+      username: null,
+      discriminator: null,
+      avatar: null,
+    },
     useRTC: false,
   },
   methods: {
@@ -28,9 +34,37 @@ new Vue({
       axios.get("/channels.json")
         .then(response => this.channels = response.data);
     },
+    updateUser() {
+      axios.get("/oauth2/user")
+        .then(response => this.user = response.data)
+    },
+    doLogin() {
+      window.location.href = "/oauth2/initiate"
+    },
+    doLogout() {
+      axios.post("/oauth2/logout")
+        .then(() => {
+          this.user.id = ""
+          this.updateUser()
+        })
+    },
+  },
+  computed: {
+    loggedIn() { return this.user.id !== null && this.user.id !== "" },
+    avatarURL() {
+      return "https://cdn.discordapp.com/avatars/"
+          + this.user.id + "/"
+          + this.user.avatar + ".png?size=32";
+    },
   },
   mounted() {
     this.updateChannels();
-    this.chinterval = window.setInterval(this.updateChannels, 5000);
+    this.updateUser();
+    this.chinterval = window.setInterval(this.updateChannels, 5000)
+    this.userinterval = window.setInterval(this.updateUser, 300000)
   },
+  beforeDestroy() {
+    window.clearInterval(this.chinterval)
+    window.clearInterval(this.userinterval)
+  }
 }).$mount('#app')

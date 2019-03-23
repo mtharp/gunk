@@ -10,7 +10,23 @@
           <b-nav-item v-for="ch in $root.channels" :key="ch" :to="{name: 'watch', params: {channel: ch}}">{{ch}}</b-nav-item>
         </b-navbar-nav>
         <b-navbar-nav class="ml-auto">
-          <b-form-checkbox switch v-model="$root.useRTC" class="navbar-text">Zero-Latency Mode (WebRTC)</b-form-checkbox>
+          <b-nav-text>
+            <b-form-checkbox switch v-model="$root.useRTC" class="mr-3">WebRTC</b-form-checkbox>
+          </b-nav-text>
+          <b-nav-form v-if="!$root.loggedIn">
+            <b-button size="sm" class="mr-sm-2" @click.prevent="$root.doLogin">Login</b-button>
+          </b-nav-form>
+          <b-nav-form v-if="$root.loggedIn">
+            <b-img
+              :src="$root.avatarURL"
+              width="32"
+              height="32"
+              rounded="circle"
+              alt="your avatar"
+              class="mr-3"
+              />
+            <b-button size="sm" class="mr-sm-2" @click.prevent="$root.doLogout">Logout</b-button>
+          </b-nav-form>
         </b-navbar-nav>
       </b-collapse>
     </b-navbar>
@@ -22,5 +38,4 @@
 nav {
   background-color: #043;
 }
-
 </style>

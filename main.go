@@ -13,11 +13,13 @@ import (
 	"net/url"
 	"os"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/gorilla/mux"
 	"github.com/nareix/joy4/av/pubsub"
 	"github.com/nareix/joy4/format/rtmp"
+	"golang.org/x/oauth2"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -30,13 +32,47 @@ type gunkServer struct {
 	channels map[string]*channel
 	mu       sync.Mutex
 
-	rtmp *rtmp.Server
+	oauth *oauth2.Config
+	rtmp  *rtmp.Server
+
+	cookieSecure             bool
+	stateCookie, loginCookie string
+	key                      [32]byte
 }
 
 func main() {
 	s := &gunkServer{
 		channels: make(map[string]*channel),
 		rtmp:     &rtmp.Server{},
+	}
+	if b := os.Getenv("BASE_URL"); b != "" {
+		b = strings.TrimSuffix(b, "/")
+		s.oauth = &oauth2.Config{
+			RedirectURL:  b + "/oauth2/cb",
+			ClientID:     os.Getenv("CLIENT_ID"),
+			ClientSecret: os.Getenv("CLIENT_SECRET"),
+			Endpoint: oauth2.Endpoint{
+				AuthURL:   "https://discordapp.com/api/oauth2/authorize",
+				TokenURL:  "https://discordapp.com/api/oauth2/token",
+				AuthStyle: oauth2.AuthStyleInHeader,
+			},
+			Scopes: []string{"identify"},
+		}
+		if strings.HasPrefix(b, "https:") {
+			s.cookieSecure = true
+			s.stateCookie = "__Host-ostate"
+			s.loginCookie = "__Host-login"
+		} else {
+			s.stateCookie = "ostate"
+			s.loginCookie = "login"
+		}
+		if k := os.Getenv("COOKIE_SECRET"); k != "" {
+			log.Fatalln("error: COOKIE_SECRET must be set")
+		} else {
+			s.setSecret(k)
+		}
+	} else {
+		log.Printf("warning: oauth not configured; set BASE_URL and CLIENT_ID and CLIENT_SECRET")
 	}
 	eg := new(errgroup.Group)
 
@@ -53,6 +89,11 @@ func main() {
 	r.HandleFunc("/", func(rw http.ResponseWriter, req *http.Request) { http.ServeFile(rw, req, "./index.html") }).Methods("GET")
 	r.HandleFunc("/channels.json", s.handleChannels)
 	r.PathPrefix("/node_modules/").Handler(http.StripPrefix("/node_modules/", http.FileServer(http.Dir("./node_modules"))))
+	// login
+	r.HandleFunc("/oauth2/user", s.viewUser)
+	r.HandleFunc("/oauth2/initiate", s.viewLogin)
+	r.HandleFunc("/oauth2/cb", s.viewCB)
+	r.HandleFunc("/oauth2/logout", s.viewLogout)
 
 	eg.Go(func() error { return http.ListenAndServe(":8009", r) })
 
