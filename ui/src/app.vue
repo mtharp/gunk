@@ -6,6 +6,7 @@
       <b-collapse is-nav id="nav_collapse">
         <b-navbar-nav>
           <b-nav-item to="/">Home</b-nav-item>
+          <b-nav-item to="/mychannels" v-if="$root.loggedIn">My Channels</b-nav-item>
           <b-nav-text>&bull;</b-nav-text>
           <b-nav-item v-for="ch in $root.channels" :key="ch" :to="{name: 'watch', params: {channel: ch}}">{{ch}}</b-nav-item>
         </b-navbar-nav>

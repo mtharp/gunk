@@ -2,6 +2,7 @@ import Vue from 'vue'
 import Router from 'vue-router'
 import Home from './views/home.vue'
 import Watch from './views/watch.vue'
+import MyChannels from './views/mychannels.vue'
 
 Vue.use(Router)
 
@@ -13,6 +14,11 @@ export default new Router({
       path: '/',
       name: 'home',
       component: Home
+    },
+    {
+      path: '/mychannels',
+      name: 'mychannels',
+      component: MyChannels,
     },
     {
       path: '/watch/:channel',

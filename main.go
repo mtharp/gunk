@@ -32,8 +32,9 @@ type gunkServer struct {
 	channels map[string]*channel
 	mu       sync.Mutex
 
-	oauth *oauth2.Config
-	rtmp  *rtmp.Server
+	oauth    *oauth2.Config
+	rtmp     *rtmp.Server
+	rtmpBase string
 
 	cookieSecure             bool
 	stateCookie, loginCookie string
@@ -41,39 +42,47 @@ type gunkServer struct {
 }
 
 func main() {
+	base := strings.TrimSuffix(os.Getenv("BASE_URL"), "/")
+	u, err := url.Parse(base)
+	if err != nil {
+		log.Fatalln("error: in BASE_URL: %s", err)
+	}
 	s := &gunkServer{
 		channels: make(map[string]*channel),
 		rtmp:     &rtmp.Server{},
+		rtmpBase: "rtmp://" + u.Hostname() + "/live",
 	}
-	if b := os.Getenv("BASE_URL"); b != "" {
-		b = strings.TrimSuffix(b, "/")
-		s.oauth = &oauth2.Config{
-			RedirectURL:  b + "/oauth2/cb",
-			ClientID:     os.Getenv("CLIENT_ID"),
-			ClientSecret: os.Getenv("CLIENT_SECRET"),
-			Endpoint: oauth2.Endpoint{
-				AuthURL:   "https://discordapp.com/api/oauth2/authorize",
-				TokenURL:  "https://discordapp.com/api/oauth2/token",
-				AuthStyle: oauth2.AuthStyleInHeader,
-			},
-			Scopes: []string{"identify"},
-		}
-		if strings.HasPrefix(b, "https:") {
-			s.cookieSecure = true
-			s.stateCookie = "__Host-ostate"
-			s.loginCookie = "__Host-login"
-		} else {
-			s.stateCookie = "ostate"
-			s.loginCookie = "login"
-		}
-		if k := os.Getenv("COOKIE_SECRET"); k != "" {
-			log.Fatalln("error: COOKIE_SECRET must be set")
-		} else {
-			s.setSecret(k)
-		}
+	s.oauth = &oauth2.Config{
+		RedirectURL:  base + "/oauth2/cb",
+		ClientID:     os.Getenv("CLIENT_ID"),
+		ClientSecret: os.Getenv("CLIENT_SECRET"),
+		Endpoint: oauth2.Endpoint{
+			AuthURL:   "https://discordapp.com/api/oauth2/authorize",
+			TokenURL:  "https://discordapp.com/api/oauth2/token",
+			AuthStyle: oauth2.AuthStyleInHeader,
+		},
+		Scopes: []string{"identify"},
+	}
+	if u.Scheme == "https" {
+		s.cookieSecure = true
+		s.stateCookie = "__Host-ostate"
+		s.loginCookie = "__Host-login"
 	} else {
-		log.Printf("warning: oauth not configured; set BASE_URL and CLIENT_ID and CLIENT_SECRET")
+		s.stateCookie = "ostate"
+		s.loginCookie = "login"
 	}
+	if base == "" || s.oauth.ClientID == "" || s.oauth.ClientSecret == "" {
+		log.Fatalln("BASE_URL, CLIENT_ID and CLIENT_SECRET must be set")
+	}
+	if k := os.Getenv("COOKIE_SECRET"); k != "" {
+		log.Fatalln("error: COOKIE_SECRET must be set")
+	} else {
+		s.setSecret(k)
+	}
+	if err := connectDB(); err != nil {
+		log.Fatalln("error: connecting to database: %s", err)
+	}
+
 	eg := new(errgroup.Group)
 
 	s.rtmp.HandlePublish = s.handleRTMP
@@ -90,10 +99,14 @@ func main() {
 	r.HandleFunc("/channels.json", s.handleChannels)
 	r.PathPrefix("/node_modules/").Handler(http.StripPrefix("/node_modules/", http.FileServer(http.Dir("./node_modules"))))
 	// login
-	r.HandleFunc("/oauth2/user", s.viewUser)
-	r.HandleFunc("/oauth2/initiate", s.viewLogin)
-	r.HandleFunc("/oauth2/cb", s.viewCB)
-	r.HandleFunc("/oauth2/logout", s.viewLogout)
+	r.HandleFunc("/oauth2/user", s.viewUser).Methods("GET")
+	r.HandleFunc("/oauth2/initiate", s.viewLogin).Methods("GET")
+	r.HandleFunc("/oauth2/cb", s.viewCB).Methods("POST")
+	r.HandleFunc("/oauth2/logout", s.viewLogout).Methods("POST")
+	// model
+	r.HandleFunc("/api/mychannels", s.viewDefs).Methods("GET")
+	r.HandleFunc("/api/mychannels", s.viewDefsCreate).Methods("POST")
+	r.HandleFunc("/api/mychannels/{name}", s.viewDefsDelete).Methods("DELETE")
 
 	eg.Go(func() error { return http.ListenAndServe(":8009", r) })
 

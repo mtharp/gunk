@@ -18,20 +18,23 @@ import (
 )
 
 func (s *gunkServer) handleRTMP(conn *rtmp.Conn) {
+	defer conn.Close()
+	remote := conn.NetConn().RemoteAddr()
 	fm := &pktque.FilterDemuxer{
 		Demuxer: conn,
 		Filter:  &pktque.FixTime{MakeIncrement: true},
 	}
 	streams, err := fm.Streams()
 	if err != nil {
-		log.Printf("[ingress] error: reading streams on %s: %s", conn.URL, err)
+		log.Printf("[ingest] error: reading streams on %s from %s: %s", conn.URL, remote, err)
+		return
+	}
+	userID := verifyChannel(conn.URL)
+	if userID == "" {
+		log.Printf("[ingest] error: stream not found or incorrect key for %s from %s", conn.URL, remote)
 		return
 	}
 	chname := path.Base(conn.URL.Path)
-	if chname == "" {
-		log.Printf("[ingress] error: invalid stream name %s", conn.URL)
-		return
-	}
 	q := pubsub.NewQueue()
 	q.WriteHeader(streams)
 	hls := new(HLSPublisher)
@@ -44,7 +47,7 @@ func (s *gunkServer) handleRTMP(conn *rtmp.Conn) {
 	s.channels[chname] = ch
 	s.mu.Unlock()
 
-	log.Printf("[ingress] publish of %s started", chname)
+	log.Printf("[ingest] publish of %s started from %s on behalf of user %s", chname, remote, userID)
 	eg, ctx := errgroup.WithContext(context.Background())
 	go func() {
 		<-ctx.Done()
@@ -57,9 +60,9 @@ func (s *gunkServer) handleRTMP(conn *rtmp.Conn) {
 		return avutil.CopyPackets(q, fm)
 	})
 	if err := eg.Wait(); err != nil {
-		log.Printf("[ingress] error: on stream %s: %s", conn.URL, err)
+		log.Printf("[ingest] error: on stream %s from %s: %s", conn.URL, remote, err)
 	}
-	log.Printf("[ingress] publish of %s stopped", chname)
+	log.Printf("[ingest] publish of %s stopped from %s on behalf of user %s", chname, remote, userID)
 	s.mu.Lock()
 	if s.channels[chname] == ch {
 		delete(s.channels, chname)

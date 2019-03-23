@@ -88,11 +88,11 @@ func (p *HLSPublisher) Publish(src av.Demuxer) error {
 
 func (p *HLSPublisher) addChunk(chunk *hlsChunk) {
 	p.mu.Lock()
-	if len(p.chunks) >= numChunks {
+	p.chunks = append(p.chunks, chunk)
+	if len(p.chunks) > numChunks {
 		copy(p.chunks, p.chunks[1:])
 		p.chunks = p.chunks[:numChunks]
 	}
-	p.chunks = append(p.chunks, chunk)
 	p.seq++
 	var maxTime time.Duration
 	for _, chunk := range p.chunks {
