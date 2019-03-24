@@ -144,15 +144,8 @@ func serveRTC(pc *webrtc.PeerConnection, vtrack *webrtc.Track, src av.Demuxer, r
 		d := ts - tsprev
 		tsprev = ts
 		// convert NALUs to Annex B
-		nalus, _ := h264parser.SplitNALUs(packet.Data)
-		if packet.IsKeyFrame {
-			nalus = append(nalus, codec.SPS(), codec.PPS())
-		}
 		buf.Reset()
-		for _, nalu := range nalus {
-			buf.Write([]byte{0, 0, 0, 1})
-			buf.Write(nalu)
-		}
+		writeAnnexBPacket(&buf, packet, codec)
 		vtrack.WriteSample(media.Sample{
 			Data:    buf.Bytes(),
 			Samples: uint32(d),

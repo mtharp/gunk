@@ -8,6 +8,11 @@ import 'bootstrap-vue/dist/bootstrap-vue.css'
 import BootstrapVue from 'bootstrap-vue'
 Vue.use(BootstrapVue)
 
+import './assets/site.css'
+
+import VueTimeago from 'vue-timeago'
+Vue.use(VueTimeago, {locale: 'en'})
+
 import HLSPlayer from './components/hlsplayer.vue'
 Vue.component('hls-player', HLSPlayer)
 import RTCPlayer from './components/rtcplayer.vue'
@@ -21,6 +26,7 @@ new Vue({
   render: h => h(App),
   data: {
     channels: null,
+    liveChannels: null,
     user: {
       id: null,
       username: null,
@@ -33,7 +39,16 @@ new Vue({
   methods: {
     updateChannels() {
       axios.get("/channels.json")
-        .then(response => this.channels = response.data);
+        .then(response => {
+          let live = new Array();
+          for (let ch of response.data) {
+            if (ch.live) {
+              live.push(ch)
+            }
+          }
+          this.channels = response.data
+          this.liveChannels = live
+        })
     },
     updateUser() {
       axios.get("/oauth2/user")
@@ -48,6 +63,9 @@ new Vue({
           this.user.id = ""
           this.updateUser()
         })
+    },
+    navChannel(ch) {
+      return {name: 'watch', params: {channel: ch.name}}
     },
   },
   computed: {

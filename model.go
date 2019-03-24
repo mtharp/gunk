@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx"
@@ -95,6 +96,17 @@ func verifyChannel(u *url.URL) (userID string) {
 		return ""
 	}
 	return userID
+}
+
+func getThumb(channelName string) (d []byte, err error) {
+	row := db.QueryRow("SELECT thumb FROM thumbs WHERE name = $1", channelName)
+	err = row.Scan(&d)
+	return
+}
+
+func putThumb(channelName string, d []byte) error {
+	_, err := db.Exec("INSERT INTO thumbs (name, thumb) VALUES ($1, $2) ON CONFLICT (name) DO UPDATE SET thumb = EXCLUDED.thumb, updated = now()", channelName, d)
+	return err
 }
 
 func (s *gunkServer) checkAuth(rw http.ResponseWriter, req *http.Request) string {
@@ -182,4 +194,29 @@ func (s *gunkServer) viewDefsDelete(rw http.ResponseWriter, req *http.Request) {
 	}
 	rw.Header().Set("Content-Type", "application/json")
 	rw.Write([]byte("{}"))
+}
+
+type channelInfo struct {
+	Name string `json:"name"`
+	Live bool   `json:"live"`
+	Last int64  `json:"last"`
+}
+
+func listChannels() (ret []channelInfo, err error) {
+	rows, err := db.Query("SELECT name, updated FROM thumbs ORDER BY greatest(now() - updated, '1 minute'::interval) ASC, 1 ASC")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var info channelInfo
+		var last time.Time
+		if err := rows.Scan(&info.Name, &last); err != nil {
+			return nil, err
+		}
+		info.Last = last.UnixNano() / 1000000
+		ret = append(ret, info)
+	}
+	err = rows.Err()
+	return
 }

@@ -38,6 +38,10 @@ func (s *gunkServer) handleRTMP(conn *rtmp.Conn) {
 	q := pubsub.NewQueue()
 	q.WriteHeader(streams)
 	hls := new(HLSPublisher)
+	if err := grabFrames(chname, q.Latest()); err != nil {
+		log.Printf("[ingest] error: setting up frame grabber on %s from %s: %s", conn.URL, remote, err)
+		return
+	}
 
 	s.mu.Lock()
 	if existing := s.channels[chname]; existing != nil {

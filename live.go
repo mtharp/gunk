@@ -9,9 +9,9 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"sort"
 
 	"github.com/gorilla/mux"
+	"github.com/jackc/pgx"
 	"github.com/nareix/joy4/av/avutil"
 	"github.com/nareix/joy4/format/ts"
 )
@@ -62,14 +62,36 @@ func (s *gunkServer) handleTS(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (s *gunkServer) handleChannels(rw http.ResponseWriter, req *http.Request) {
-	chNames := []string{}
+	infos, err := listChannels()
+	if err != nil {
+		log.Printf("error: listing channels: %s", err)
+		http.Error(rw, "", 500)
+	}
 	s.mu.Lock()
-	for chName := range s.channels {
-		chNames = append(chNames, chName)
+	for i, info := range infos {
+		if s.channels[info.Name] != nil {
+			infos[i].Live = true
+		}
 	}
 	s.mu.Unlock()
-	sort.Strings(chNames)
-	blob, _ := json.Marshal(chNames)
+	blob, _ := json.Marshal(infos)
 	rw.Header().Set("Content-Type", "application/json")
 	rw.Write(blob)
+}
+
+func (s *gunkServer) handleThumb(rw http.ResponseWriter, req *http.Request) {
+	chname := mux.Vars(req)["channel"]
+	jpeg, err := getThumb(chname)
+	if err == pgx.ErrNoRows {
+		log.Printf("not found: %s", req.URL)
+		http.NotFound(rw, req)
+		return
+	} else if err != nil {
+		log.Printf("error: getting thumbnail: %s", err)
+		http.Error(rw, "", 500)
+		return
+	}
+	rw.Header().Set("Cache-Control", "max-age=2592000, public, immutable")
+	rw.Header().Set("Content-Type", "image/jpeg")
+	rw.Write(jpeg)
 }

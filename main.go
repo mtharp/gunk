@@ -99,6 +99,7 @@ func main() {
 	uiRoutes(r)
 	r.HandleFunc("/", func(rw http.ResponseWriter, req *http.Request) { http.ServeFile(rw, req, "./index.html") }).Methods("GET")
 	r.HandleFunc("/channels.json", s.handleChannels)
+	r.HandleFunc("/thumbs/{channel}/{timestamp}.jpg", s.handleThumb)
 	r.PathPrefix("/node_modules/").Handler(http.StripPrefix("/node_modules/", http.FileServer(http.Dir("./node_modules"))))
 	// login
 	r.HandleFunc("/oauth2/user", s.viewUser).Methods("GET")
