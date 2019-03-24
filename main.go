@@ -6,13 +6,11 @@
 package main
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"os"
-	"sort"
 	"strings"
 	"sync"
 
@@ -74,13 +72,16 @@ func main() {
 	if base == "" || s.oauth.ClientID == "" || s.oauth.ClientSecret == "" {
 		log.Fatalln("BASE_URL, CLIENT_ID and CLIENT_SECRET must be set")
 	}
-	if k := os.Getenv("COOKIE_SECRET"); k != "" {
+	if k := os.Getenv("COOKIE_SECRET"); k == "" {
 		log.Fatalln("error: COOKIE_SECRET must be set")
 	} else {
 		s.setSecret(k)
 	}
+	if v := os.Getenv("RTMP_URL"); v != "" {
+		s.rtmpBase = strings.TrimSuffix(v, "/") + "/live"
+	}
 	if err := connectDB(); err != nil {
-		log.Fatalln("error: connecting to database: %s", err)
+		log.Fatalln("error: connecting to database:", err)
 	}
 
 	eg := new(errgroup.Group)
@@ -89,7 +90,8 @@ func main() {
 	eg.Go(s.rtmp.ListenAndServe)
 
 	r := mux.NewRouter()
-	// HLS
+	// video
+	r.HandleFunc("/live/{channel}.ts", s.handleTS).Methods("GET")
 	r.HandleFunc("/hls/{channel}/{filename}", s.handleHLS).Methods("GET")
 	// RTC
 	r.HandleFunc("/sdp/{channel}", s.handleRTC).Methods("POST")
@@ -101,14 +103,14 @@ func main() {
 	// login
 	r.HandleFunc("/oauth2/user", s.viewUser).Methods("GET")
 	r.HandleFunc("/oauth2/initiate", s.viewLogin).Methods("GET")
-	r.HandleFunc("/oauth2/cb", s.viewCB).Methods("POST")
+	r.HandleFunc("/oauth2/cb", s.viewCB).Methods("GET")
 	r.HandleFunc("/oauth2/logout", s.viewLogout).Methods("POST")
 	// model
 	r.HandleFunc("/api/mychannels", s.viewDefs).Methods("GET")
 	r.HandleFunc("/api/mychannels", s.viewDefsCreate).Methods("POST")
 	r.HandleFunc("/api/mychannels/{name}", s.viewDefsDelete).Methods("DELETE")
 
-	eg.Go(func() error { return http.ListenAndServe(":8009", r) })
+	eg.Go(func() error { return http.ListenAndServe(":8009", middleware(r)) })
 
 	//	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 	//		l.RLock()
@@ -139,48 +141,6 @@ func main() {
 	}
 }
 
-func (s *gunkServer) handleHLS(rw http.ResponseWriter, req *http.Request) {
-	chname := mux.Vars(req)["channel"]
-	s.mu.Lock()
-	ch := s.channels[chname]
-	s.mu.Unlock()
-	if ch == nil {
-		log.Printf("not found: %s", req.URL)
-		http.NotFound(rw, req)
-		return
-	}
-	ch.hls.ServeHTTP(rw, req)
-}
-
-func (s *gunkServer) handleRTC(rw http.ResponseWriter, req *http.Request) {
-	chname := mux.Vars(req)["channel"]
-	s.mu.Lock()
-	ch := s.channels[chname]
-	s.mu.Unlock()
-	if ch == nil {
-		log.Printf("not found: %s", req.URL)
-		http.NotFound(rw, req)
-		return
-	}
-	if err := handleSDP(rw, req, ch.queue); err != nil {
-		log.Printf("error: failed to start webrtc session to %s: %s", req.RemoteAddr, err)
-		http.Error(rw, "failed to start webrtc session", 500)
-	}
-}
-
-func (s *gunkServer) handleChannels(rw http.ResponseWriter, req *http.Request) {
-	chNames := []string{}
-	s.mu.Lock()
-	for chName := range s.channels {
-		chNames = append(chNames, chName)
-	}
-	s.mu.Unlock()
-	sort.Strings(chNames)
-	blob, _ := json.Marshal(chNames)
-	rw.Header().Set("Content-Type", "application/json")
-	rw.Write(blob)
-}
-
 func uiRoutes(r *mux.Router) {
 	uiLoc := os.Getenv("UI")
 	if uiLoc == "" {
@@ -204,4 +164,20 @@ func uiRoutes(r *mux.Router) {
 	r.Handle("/hls/{channel}", indexHandler)
 	r.Handle("/rtc/{channel}", indexHandler)
 	r.NotFoundHandler = handler
+
+	// proxy avatars to avoid being blocked by privacy tools
+	cdn, _ := url.Parse("https://cdn.discordapp.com")
+	avatars := httputil.NewSingleHostReverseProxy(cdn)
+	r.PathPrefix("/avatars").HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		req.Host = cdn.Host
+		avatars.ServeHTTP(rw, req)
+	})
+}
+
+func middleware(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		rw.Header().Set("Referrer-Policy", "no-referrer")
+		rw.Header().Set("X-Content-Type-Options", "nosniff")
+		h.ServeHTTP(rw, req)
+	})
 }

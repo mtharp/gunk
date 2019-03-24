@@ -1,6 +1,9 @@
 <template>
   <video-js
     id="player"
+    autoplay
+    muted
+    controls
     class="video-js vjs-default-skin w-100 h-100"
     >
     <source :src="hlsURL" type="application/x-mpegURL" />

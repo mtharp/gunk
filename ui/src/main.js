@@ -27,7 +27,8 @@ new Vue({
       discriminator: null,
       avatar: null,
     },
-    useRTC: false,
+    showStreamInfo: false,
+    playerType: "HLS",
   },
   methods: {
     updateChannels() {
@@ -52,9 +53,7 @@ new Vue({
   computed: {
     loggedIn() { return this.user.id !== null && this.user.id !== "" },
     avatarURL() {
-      return "https://cdn.discordapp.com/avatars/"
-          + this.user.id + "/"
-          + this.user.avatar + ".png?size=32";
+      return "/avatars/" + this.user.id + "/" + this.user.avatar + ".png?size=32";
     },
   },
   mounted() {

@@ -1,7 +1,9 @@
 <template>
   <video
+    autoplay
+    muted
+    controls
     class="w-100 h-100"
-    muted controls
     />
 </template>
 

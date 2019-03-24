@@ -7,15 +7,19 @@
         <b-navbar-nav>
           <b-nav-item to="/">Home</b-nav-item>
           <b-nav-item to="/mychannels" v-if="$root.loggedIn">My Channels</b-nav-item>
-          <b-nav-text>&bull;</b-nav-text>
+          <b-nav-text>&bull; Watch:</b-nav-text>
           <b-nav-item v-for="ch in $root.channels" :key="ch" :to="{name: 'watch', params: {channel: ch}}">{{ch}}</b-nav-item>
         </b-navbar-nav>
         <b-navbar-nav class="ml-auto">
-          <b-nav-text>
-            <b-form-checkbox switch v-model="$root.useRTC" class="mr-3">WebRTC</b-form-checkbox>
+          <b-nav-text v-if="$route.name == 'watch'">
+            <b-button size="sm" class="mr-3" @click="$root.showStreamInfo = true">Info</b-button>
+            <b-form-radio-group buttons size="sm" class="mr-3" v-model="$root.playerType">
+              <b-form-radio value="HLS">HLS</b-form-radio>
+              <b-form-radio value="RTC">RTC</b-form-radio>
+            </b-form-radio-group>
           </b-nav-text>
           <b-nav-form v-if="!$root.loggedIn">
-            <b-button size="sm" class="mr-sm-2" @click.prevent="$root.doLogin">Login</b-button>
+            <b-button size="sm" class="mr-2" @click.prevent="$root.doLogin">Login</b-button>
           </b-nav-form>
           <b-nav-form v-if="$root.loggedIn">
             <b-img
@@ -38,5 +42,6 @@
 <style>
 nav {
   background-color: #043;
+  height: 56px;
 }
 </style>
