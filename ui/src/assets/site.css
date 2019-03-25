@@ -1,6 +1,16 @@
+.navbar-brand img {
+    margin-right: 0.5rem;
+}
+
 nav {
     background-color: #043;
     height: 56px;
+    z-index: 1;
+}
+
+nav .show, nav .collapsing {
+    background-color: #002218;
+    padding: 1rem;
 }
 
 .home {

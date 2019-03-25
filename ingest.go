@@ -10,6 +10,7 @@ import (
 	"log"
 	"path"
 
+	"github.com/mtharp/gunk/opus"
 	"github.com/nareix/joy4/av/avutil"
 	"github.com/nareix/joy4/av/pktque"
 	"github.com/nareix/joy4/av/pubsub"
@@ -37,26 +38,31 @@ func (s *gunkServer) handleRTMP(conn *rtmp.Conn) {
 	chname := path.Base(conn.URL.Path)
 	q := pubsub.NewQueue()
 	q.WriteHeader(streams)
-	hls := new(HLSPublisher)
-	if err := grabFrames(chname, q.Latest()); err != nil {
-		log.Printf("[ingest] error: setting up frame grabber on %s from %s: %s", conn.URL, remote, err)
-		return
-	}
-
-	s.mu.Lock()
-	if existing := s.channels[chname]; existing != nil {
-		existing.queue.Close()
-	}
-	ch := &channel{q, hls}
-	s.channels[chname] = ch
-	s.mu.Unlock()
-
-	log.Printf("[ingest] publish of %s started from %s on behalf of user %s", chname, remote, userID)
 	eg, ctx := errgroup.WithContext(context.Background())
 	go func() {
 		<-ctx.Done()
 		q.Close()
 	}()
+	hls := new(HLSPublisher)
+	if err := grabFrames(chname, q.Latest()); err != nil {
+		log.Printf("[ingest] error: setting up frame grabber on %s from %s: %s", conn.URL, remote, err)
+		return
+	}
+	opusq := pubsub.NewQueue()
+	eg.Go(func() error {
+		defer opusq.Close()
+		return opus.Convert(q.Latest(), opusq)
+	})
+
+	s.mu.Lock()
+	if existing := s.channels[chname]; existing != nil {
+		existing.queue.Close()
+	}
+	ch := &channel{q, opusq, hls}
+	s.channels[chname] = ch
+	s.mu.Unlock()
+
+	log.Printf("[ingest] publish of %s started from %s on behalf of user %s", chname, remote, userID)
 	eg.Go(func() error {
 		return hls.Publish(q.Latest())
 	})

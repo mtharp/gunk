@@ -17,6 +17,7 @@ require (
 	golang.org/x/oauth2 v0.0.0-20190319182350-c85d3e98c914
 	golang.org/x/sync v0.0.0-20181221193216-37e7f081c4d4
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
+	layeh.com/gopus v0.0.0-20161224163843-0ebf989153aa
 )
 
 replace github.com/nareix/joy4 => github.com/mtharp/joy4 v0.0.0-20190323221533-84311da2c824

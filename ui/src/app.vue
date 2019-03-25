@@ -1,7 +1,10 @@
 <template>
   <div id="app">
     <b-navbar toggleable="lg" type="dark">
-      <b-navbar-brand to="/">gunk</b-navbar-brand>
+      <b-navbar-brand to="/">
+        <img src="/cheese.png" width="58" height="40" alt="cheese" />
+        gunk
+      </b-navbar-brand>
       <b-navbar-toggle target="nav_collapse" />
       <b-collapse is-nav id="nav_collapse">
         <b-navbar-nav>

@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/mtharp/gunk/opus"
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/av/pubsub"
 	"github.com/nareix/joy4/codec/h264parser"
@@ -32,6 +33,7 @@ var rtcConf = webrtc.Configuration{
 }
 
 func handleSDP(rw http.ResponseWriter, req *http.Request, queue *pubsub.Queue) error {
+	// parse offer
 	blob, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		return err
@@ -41,7 +43,25 @@ func handleSDP(rw http.ResponseWriter, req *http.Request, queue *pubsub.Queue) e
 		http.Error(rw, "invalid offer", 400)
 		return nil
 	}
-	remote := req.RemoteAddr
+	// build tracks
+	dm := queue.Latest()
+	streams, err := dm.Streams()
+	if err != nil {
+		return err
+	}
+	var hasAudio bool
+	for _, s := range streams {
+		if s.Type().IsAudio() {
+			if s.Type() != opus.OPUS {
+				return fmt.Errorf("unsupported audio codec %s", s.Type())
+			}
+			hasAudio = true
+		} else {
+			if s.Type() != av.H264 {
+				return fmt.Errorf("unsupported video codec %s", s.Type())
+			}
+		}
+	}
 	peerConnection, err := webrtc.NewPeerConnection(rtcConf)
 	if err != nil {
 		return err
@@ -55,6 +75,18 @@ func handleSDP(rw http.ResponseWriter, req *http.Request, queue *pubsub.Queue) e
 		peerConnection.Close()
 		return err
 	}
+	var atrack *webrtc.Track
+	if hasAudio {
+		atrack, err = peerConnection.NewTrack(webrtc.DefaultPayloadTypeOpus, rand.Uint32(), "audio", "audio")
+		if err != nil {
+			return err
+		}
+		if _, err := peerConnection.AddTrack(atrack); err != nil {
+			return err
+		}
+	}
+	// build answer
+	remote := req.RemoteAddr
 	if err := peerConnection.SetRemoteDescription(offer); err != nil {
 		peerConnection.Close()
 		return err
@@ -74,34 +106,35 @@ func handleSDP(rw http.ResponseWriter, req *http.Request, queue *pubsub.Queue) e
 		return err
 	}
 	rw.Write(blob)
+	// serve in background
 	go func() {
-		if err := serveRTC(peerConnection, vtrack, queue.Latest(), remote); err != nil {
+		if err := serveRTC(peerConnection, vtrack, atrack, dm, remote); err != nil {
 			log.Printf("error: serving rtc to %s: %s", remote, err)
 		}
 	}()
 	return nil
 }
 
-func serveRTC(pc *webrtc.PeerConnection, vtrack *webrtc.Track, src av.Demuxer, remote string) error {
+func serveRTC(pc *webrtc.PeerConnection, vtrack, atrack *webrtc.Track, src av.Demuxer, remote string) error {
 	defer pc.Close()
 	stateCh := make(chan bool, 1)
 	pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
 		log.Printf("[rtc] %s connection state: %s", remote, state)
 		stateCh <- state == webrtc.ICEConnectionStateConnected
 	})
-	streams, err := src.Streams()
-	if err != nil {
-		return fmt.Errorf("getting streams: %s", err)
-	}
+	streams, _ := src.Streams()
+	aidx := -1
 	vidx := -1
-	var codec h264parser.CodecData
+	var vcodec h264parser.CodecData
 	for i, s := range streams {
 		if s.Type().IsVideo() {
 			if s.Type() != av.H264 {
 				return errors.New("unsupported video codec")
 			}
 			vidx = i
-			codec = s.(h264parser.CodecData)
+			vcodec = s.(h264parser.CodecData)
+		} else if s.Type().IsAudio() {
+			aidx = i
 		}
 	}
 	if vidx < 0 {
@@ -111,7 +144,8 @@ func serveRTC(pc *webrtc.PeerConnection, vtrack *webrtc.Track, src av.Demuxer, r
 	t := time.NewTimer(rtcIdleTime)
 	var connected bool
 	var buf bytes.Buffer
-	var tsprev uint64
+	var tsprev, asprev uint64
+	var lastWarn time.Time
 	for {
 		// check if still connected
 		select {
@@ -135,21 +169,40 @@ func serveRTC(pc *webrtc.PeerConnection, vtrack *webrtc.Track, src av.Demuxer, r
 		} else if err != nil {
 			return fmt.Errorf("read error: %s", err)
 		}
-		if packet.Idx != int8(vidx) {
-			continue
+		switch int(packet.Idx) {
+		case vidx:
+			// convert timestamp to 90khz
+			hi, lo := bits.Mul64(uint64(packet.Time), 90000)
+			ts, _ := bits.Div64(hi, lo, uint64(time.Second))
+			d := ts - tsprev
+			tsprev = ts
+			// convert NALUs to Annex B
+			buf.Reset()
+			writeAnnexBPacket(&buf, packet, vcodec)
+			if err := vtrack.WriteSample(media.Sample{
+				Data:    buf.Bytes(),
+				Samples: uint32(d),
+			}); err != nil {
+				if time.Since(lastWarn) < 10*time.Second {
+					log.Printf("[rtc] writing to %s: %s", remote, err)
+					lastWarn = time.Now()
+				}
+			}
+		case aidx:
+			hi, lo := bits.Mul64(uint64(packet.Time), 48000)
+			ts, _ := bits.Div64(hi, lo, uint64(time.Second))
+			d := ts - asprev
+			asprev = ts
+			if err := atrack.WriteSample(media.Sample{
+				Data:    packet.Data,
+				Samples: uint32(d),
+			}); err != nil {
+				if time.Since(lastWarn) < 10*time.Second {
+					log.Printf("[rtc] writing to %s: %s", remote, err)
+					lastWarn = time.Now()
+				}
+			}
 		}
-		// convert timestamp to 90khz
-		hi, lo := bits.Mul64(uint64(packet.Time), 90000)
-		ts, _ := bits.Div64(hi, lo, uint64(time.Second))
-		d := ts - tsprev
-		tsprev = ts
-		// convert NALUs to Annex B
-		buf.Reset()
-		writeAnnexBPacket(&buf, packet, codec)
-		vtrack.WriteSample(media.Sample{
-			Data:    buf.Bytes(),
-			Samples: uint32(d),
-		})
 	}
 	return nil
 }

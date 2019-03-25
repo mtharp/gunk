@@ -25,9 +25,14 @@ export default {
       }],
     })
     this.pc = pc
+    this.ms = new MediaStream()
     pc.ontrack = (ev) => {
-      this.$el.srcObject = ev.streams[0];
-      this.$el.play()
+      this.ms.addTrack(ev.track)
+      try {
+        this.$el.srcObject = this.ms
+      } catch (error) {
+        this.$el.src = URL.createObjectURL(this.ms)
+      }
     }
     pc.onicecandidate = (ev) => {
       if (ev.candidate === null) {

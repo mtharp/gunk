@@ -58,7 +58,7 @@ func grabFrames(channelName string, dm av.Demuxer) error {
 			if buf.Len() != 0 && (!pkt.IsKeyFrame || pkt.Time != keyTime) {
 				if time.Since(lastGrab) >= grabInterval {
 					if err := makeFrame(channelName, vidCodec, buf.Bytes()); err != nil {
-						log.Println("error: making thumbnail: %s", err)
+						log.Println("error: making thumbnail:", err)
 					}
 					lastGrab = time.Now()
 				}

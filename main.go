@@ -23,6 +23,7 @@ import (
 
 type channel struct {
 	queue *pubsub.Queue
+	opusq *pubsub.Queue
 	hls   *HLSPublisher
 }
 
@@ -162,8 +163,7 @@ func uiRoutes(r *mux.Router) {
 		handler.ServeHTTP(rw, req)
 	})
 	r.Handle("/", indexHandler)
-	r.Handle("/hls/{channel}", indexHandler)
-	r.Handle("/rtc/{channel}", indexHandler)
+	r.Handle("/watch/{channel}", indexHandler)
 	r.NotFoundHandler = handler
 
 	// proxy avatars to avoid being blocked by privacy tools

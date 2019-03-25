@@ -4,7 +4,7 @@ COPY go.mod go.sum ./
 COPY _srtp _srtp
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 go build -o /gunk -ldflags "-w -s" -v .
+RUN go build -o /gunk -ldflags "-w -s" -v .
 
 FROM node AS uibuild
 WORKDIR /work
@@ -13,8 +13,8 @@ RUN npm install
 COPY ui/ ./
 RUN npm run build
 
-FROM alpine
-RUN apk add --no-cache ca-certificates tzdata
+FROM debian:testing-slim
+RUN apt update && apt install -y ffmpeg && rm -rf /var/lib/apt/lists/*
 COPY --from=gobuild /gunk /usr/bin/gunk
 COPY --from=uibuild /work/dist /usr/share/gunk/ui
 CMD ["/usr/bin/gunk"]

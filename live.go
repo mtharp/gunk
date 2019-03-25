@@ -39,7 +39,7 @@ func (s *gunkServer) handleRTC(rw http.ResponseWriter, req *http.Request) {
 		http.NotFound(rw, req)
 		return
 	}
-	if err := handleSDP(rw, req, ch.queue); err != nil {
+	if err := handleSDP(rw, req, ch.opusq); err != nil {
 		log.Printf("error: failed to start webrtc session to %s: %s", req.RemoteAddr, err)
 		http.Error(rw, "failed to start webrtc session", 500)
 	}
