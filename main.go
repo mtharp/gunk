@@ -11,6 +11,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -31,9 +32,10 @@ type gunkServer struct {
 	channels map[string]*channel
 	mu       sync.Mutex
 
-	oauth    *oauth2.Config
-	rtmp     *rtmp.Server
-	rtmpBase string
+	oauth       *oauth2.Config
+	rtmp        *rtmp.Server
+	rtmpBase    string
+	opusBitrate int
 
 	cookieSecure             bool
 	stateCookie, loginCookie string
@@ -80,6 +82,11 @@ func main() {
 	}
 	if v := os.Getenv("RTMP_URL"); v != "" {
 		s.rtmpBase = strings.TrimSuffix(v, "/") + "/live"
+	}
+	if v, _ := strconv.Atoi(os.Getenv("OPUS_BITRATE")); v > 0 {
+		s.opusBitrate = v
+	} else {
+		s.opusBitrate = 128000
 	}
 	if err := connectDB(); err != nil {
 		log.Fatalln("error: connecting to database:", err)

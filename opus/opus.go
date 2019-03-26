@@ -80,7 +80,7 @@ func (d CodecData) PacketDuration(pkt []byte) (time.Duration, error) {
 	return time.Duration(numFr) * opusFrameTimes[config], nil
 }
 
-func Convert(src av.Demuxer, dest *pubsub.Queue) error {
+func Convert(src av.Demuxer, dest *pubsub.Queue, bitrate int) error {
 	streams, err := src.Streams()
 	if err != nil {
 		return err
@@ -173,7 +173,7 @@ func Convert(src av.Demuxer, dest *pubsub.Queue) error {
 		if err != nil {
 			return err
 		}
-		encoder.SetBitrate(64000)
+		encoder.SetBitrate(bitrate)
 		sbuf := make([]byte, samplesPerPacket*channels*2)
 		samples := make([]int16, samplesPerPacket*channels)
 		var ts time.Duration

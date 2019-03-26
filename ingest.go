@@ -51,7 +51,7 @@ func (s *gunkServer) handleRTMP(conn *rtmp.Conn) {
 	opusq := pubsub.NewQueue()
 	eg.Go(func() error {
 		defer opusq.Close()
-		return opus.Convert(q.Latest(), opusq)
+		return opus.Convert(q.Latest(), opusq, s.opusBitrate)
 	})
 
 	s.mu.Lock()
