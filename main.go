@@ -186,6 +186,7 @@ func middleware(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		rw.Header().Set("Referrer-Policy", "no-referrer")
 		rw.Header().Set("X-Content-Type-Options", "nosniff")
+		rw.Header().Set("Access-Control-Allow-Origin", "*")
 		h.ServeHTTP(rw, req)
 	})
 }
