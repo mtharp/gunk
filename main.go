@@ -120,31 +120,6 @@ func main() {
 	r.HandleFunc("/api/mychannels/{name}", s.viewDefsDelete).Methods("DELETE")
 
 	eg.Go(func() error { return http.ListenAndServe(":8009", middleware(r)) })
-
-	//	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-	//		l.RLock()
-	//		ch := channels[r.URL.Path]
-	//		l.RUnlock()
-	//
-	//		if ch != nil {
-	//			//w.Header().Set("Content-Type", "video/x-flv")
-	//			//w.Header().Set("Transfer-Encoding", "chunked")
-	//			w.Header().Set("Access-Control-Allow-Origin", "*")
-	//			w.WriteHeader(200)
-	//			//flusher := w.(http.Flusher)
-	//			//flusher.Flush()
-	//			//muxer := flv.NewMuxerWriteFlusher(writeFlusher{httpflusher: flusher, Writer: w})
-	//			muxer := ts.NewMuxer(w)
-	//			cursor := ch.que.Latest()
-	//
-	//			avutil.CopyFile(muxer, cursor)
-	//		} else {
-	//			http.NotFound(w, r)
-	//		}
-	//	})
-	//
-	//	go http.ListenAndServe(":8089", nil)
-
 	if err := eg.Wait(); err != nil {
 		log.Fatalln("error:", err)
 	}

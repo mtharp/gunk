@@ -17,8 +17,8 @@ import (
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/av/pubsub"
 	"github.com/nareix/joy4/codec/h264parser"
-	"github.com/pions/webrtc"
-	"github.com/pions/webrtc/pkg/media"
+	"github.com/pion/webrtc/v2"
+	"github.com/pion/webrtc/v2/pkg/media"
 )
 
 const rtcIdleTime = 60 * time.Second

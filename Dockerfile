@@ -14,7 +14,7 @@ COPY ui/ ./
 RUN npm run build
 
 FROM debian:testing-slim
-RUN apt update && apt install -y ffmpeg && rm -rf /var/lib/apt/lists/*
+RUN apt update && apt install -y ca-certificates ffmpeg && rm -rf /var/lib/apt/lists/*
 COPY --from=gobuild /gunk /usr/bin/gunk
 COPY --from=uibuild /work/dist /usr/share/gunk/ui
 CMD ["/usr/bin/gunk"]

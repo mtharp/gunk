@@ -11,7 +11,7 @@ import (
 	"io"
 	"net/http"
 	"path"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/nareix/joy4/av"
@@ -45,11 +45,15 @@ func newChunk(data []byte, start, dur time.Duration) *hlsChunk {
 }
 
 type HLSPublisher struct {
-	mu        sync.Mutex
-	chunks    []*hlsChunk
-	targetDur time.Duration
-	last      time.Time
-	seq       int64
+	chunks []*hlsChunk
+	last   time.Time
+	seq    int64
+	state  atomic.Value
+}
+
+type hlsState struct {
+	playlist []byte
+	chunks   []hlsChunk
 }
 
 func (p *HLSPublisher) Publish(src av.Demuxer) error {
@@ -87,66 +91,57 @@ func (p *HLSPublisher) Publish(src av.Demuxer) error {
 }
 
 func (p *HLSPublisher) addChunk(chunk *hlsChunk) {
-	p.mu.Lock()
+	// shift chunks
 	p.chunks = append(p.chunks, chunk)
 	if len(p.chunks) > numChunks {
 		copy(p.chunks, p.chunks[1:])
 		p.chunks = p.chunks[:numChunks]
 	}
 	p.seq++
+	// determine keyframe time
 	var maxTime time.Duration
 	for _, chunk := range p.chunks {
 		if chunk.dur > maxTime {
 			maxTime = chunk.dur
 		}
 	}
-	p.targetDur = maxTime.Round(time.Second)
-	p.last = time.Now()
-	p.mu.Unlock()
-}
-
-func (p *HLSPublisher) Last() time.Time {
-	p.mu.Lock()
-	t := p.last
-	p.mu.Unlock()
-	return t
-}
-
-func (p *HLSPublisher) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	bn := path.Base(req.URL.Path)
-	if bn == "index.m3u8" {
-		p.servePlaylist(rw, req)
-		return
-	}
-	var chunk *hlsChunk
-	p.mu.Lock()
-	for _, c := range p.chunks {
-		if c.name == bn {
-			chunk = c
-		}
-	}
-	p.mu.Unlock()
-	if chunk != nil {
-		rw.Header().Set("Content-Type", "video/MP2T")
-		rw.Write(chunk.data)
-	} else {
-		http.NotFound(rw, req)
-	}
-}
-
-func (p *HLSPublisher) servePlaylist(rw http.ResponseWriter, req *http.Request) {
+	maxTime = maxTime.Round(time.Second)
+	// build playlist
 	var b bytes.Buffer
-	p.mu.Lock()
-	td := p.targetDur
-	if td == 0 {
-		td = assumeKI
+	if maxTime == 0 {
+		maxTime = assumeKI
 	}
-	fmt.Fprintf(&b, "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:%d\n", int(td.Seconds()))
+	fmt.Fprintf(&b, "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:%d\n", int(maxTime.Seconds()))
 	fmt.Fprintf(&b, "#EXT-X-MEDIA-SEQUENCE:%d\n", p.seq)
 	for _, chunk := range p.chunks {
 		b.WriteString(chunk.Format())
 	}
-	p.mu.Unlock()
-	rw.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
-	rw.Write(b.Bytes())
+	// publish
+	pubChunks := make([]hlsChunk, len(p.chunks))
+	for i, chunk := range p.chunks {
+		pubChunks[i] = *chunk
+	}
+	p.state.Store(hlsState{b.Bytes(), pubChunks})
+}
+
+func (p *HLSPublisher) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	state, ok := p.state.Load().(hlsState)
+	if !ok {
+		http.NotFound(rw, req)
+		return
+	}
+	bn := path.Base(req.URL.Path)
+	if bn == "index.m3u8" {
+		rw.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
+		rw.Write(state.playlist)
+		return
+	}
+	for _, chunk := range state.chunks {
+		if chunk.name == bn {
+			rw.Header().Set("Content-Type", "video/MP2T")
+			rw.Write(chunk.data)
+			return
+		}
+	}
+	http.NotFound(rw, req)
 }

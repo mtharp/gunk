@@ -40,7 +40,9 @@ export default {
           .then(d => pc.setRemoteDescription(new RTCSessionDescription(d.data)));
       }
     }
-    pc.createOffer({offerToReceiveVideo: true, offerToReceiveAudio: true}).then(d => this.pc.setLocalDescription(d));
+    pc.addTransceiver("audio")
+    pc.addTransceiver("video")
+    pc.createOffer().then(d => this.pc.setLocalDescription(d));
   },
   beforeDestroy() {
     this.pc.close();
