@@ -31,3 +31,5 @@ require (
 	gopkg.in/yaml.v2 v2.2.2 // indirect
 	layeh.com/gopus v0.0.0-20161224163843-0ebf989153aa
 )
+
+replace github.com/nareix/joy4 => github.com/mtharp/joy4 v0.0.0-20190323221533-84311da2c824

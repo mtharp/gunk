@@ -34,8 +34,8 @@ github.com/lucas-clemente/quic-go v0.11.1 h1:zasajC848Dqq/+WqfqBCkmPw+YHNe1MBts/
 github.com/lucas-clemente/quic-go v0.11.1/go.mod h1:PpMmPfPKO9nKJ/psF49ESTAGQSdfXxlg1otPbEB2nOw=
 github.com/marten-seemann/qtls v0.2.3 h1:0yWJ43C62LsZt08vuQJDK1uC1czUc3FJeCLPoNAI4vA=
 github.com/marten-seemann/qtls v0.2.3/go.mod h1:xzjG7avBwGGbdZ8dTGxlBnLArsVKLvwmjgmPuiQEcYk=
-github.com/nareix/joy4 v0.0.0-20181022032202-3ddbc8f9d431 h1:nWhrOsCKdV6bivw03k7MROF2tYzCFGfYBYFrTEHyucs=
-github.com/nareix/joy4 v0.0.0-20181022032202-3ddbc8f9d431/go.mod h1:aFJ1ZwLjvHN4yEzE5Bkz8rD8/d8Vlj3UIuvz2yfET7I=
+github.com/mtharp/joy4 v0.0.0-20190323221533-84311da2c824 h1:Adh0vp06L9xpnAyniADaGskRzbn68v5v7dqipm9k/R4=
+github.com/mtharp/joy4 v0.0.0-20190323221533-84311da2c824/go.mod h1:9HJLGl0AMTn8hZtdcaJMsxZMT42XvoOS3Bbdw8WskWo=
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.7.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.8.0 h1:VkHVNpR4iVnU8XQR6DBm8BqYjN7CRzw+xKUbVVbbW9w=
