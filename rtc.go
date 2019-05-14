@@ -17,6 +17,7 @@ import (
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/av/pubsub"
 	"github.com/nareix/joy4/codec/h264parser"
+	"github.com/pion/rtp/codecs"
 	"github.com/pion/webrtc/v2"
 	"github.com/pion/webrtc/v2/pkg/media"
 )
@@ -31,6 +32,11 @@ var rtcConf = webrtc.Configuration{
 		},
 	}},
 }
+
+var (
+	opusCodec = webrtc.NewRTPOpusCodec(webrtc.DefaultPayloadTypeOpus, 48000)
+	h264Codec = webrtc.NewRTPCodec(webrtc.RTPCodecTypeVideo, webrtc.H264, 90000, 0, "profile-level-id=42e01f;level-asymmetry-allowed=1;packetization-mode=1", 102, new(codecs.H264Payloader))
+)
 
 func handleSDP(rw http.ResponseWriter, req *http.Request, queue *pubsub.Queue) error {
 	// parse offer
@@ -62,11 +68,15 @@ func handleSDP(rw http.ResponseWriter, req *http.Request, queue *pubsub.Queue) e
 			}
 		}
 	}
-	peerConnection, err := webrtc.NewPeerConnection(rtcConf)
+	var m webrtc.MediaEngine
+	m.RegisterCodec(opusCodec)
+	m.RegisterCodec(h264Codec)
+	api := webrtc.NewAPI(webrtc.WithMediaEngine(m))
+	peerConnection, err := api.NewPeerConnection(rtcConf)
 	if err != nil {
 		return err
 	}
-	vtrack, err := peerConnection.NewTrack(webrtc.DefaultPayloadTypeH264, rand.Uint32(), "video", "video")
+	vtrack, err := peerConnection.NewTrack(h264Codec.PayloadType, rand.Uint32(), "video", "video")
 	if err != nil {
 		peerConnection.Close()
 		return err
@@ -77,7 +87,7 @@ func handleSDP(rw http.ResponseWriter, req *http.Request, queue *pubsub.Queue) e
 	}
 	var atrack *webrtc.Track
 	if hasAudio {
-		atrack, err = peerConnection.NewTrack(webrtc.DefaultPayloadTypeOpus, rand.Uint32(), "audio", "audio")
+		atrack, err = peerConnection.NewTrack(opusCodec.PayloadType, rand.Uint32(), "audio", "audio")
 		if err != nil {
 			return err
 		}
