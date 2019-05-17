@@ -138,6 +138,7 @@ func (p *HLSPublisher) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 	for _, chunk := range state.chunks {
 		if chunk.name == bn {
+			setImmutable(rw)
 			rw.Header().Set("Content-Type", "video/MP2T")
 			rw.Write(chunk.data)
 			return

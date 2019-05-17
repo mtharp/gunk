@@ -1,7 +1,6 @@
 FROM golang AS gobuild
 WORKDIR /work
 COPY go.mod go.sum ./
-COPY _srtp _srtp
 RUN go mod download
 COPY . .
 RUN go build -o /gunk -ldflags "-w -s" -v .

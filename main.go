@@ -11,6 +11,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -146,7 +147,7 @@ func uiRoutes(r *mux.Router) {
 	})
 	r.Handle("/", indexHandler)
 	r.Handle("/watch/{channel}", indexHandler)
-	r.NotFoundHandler = handler
+	r.NotFoundHandler = cacheImmutable(handler)
 
 	// proxy avatars to avoid being blocked by privacy tools
 	cdn, _ := url.Parse("https://cdn.discordapp.com")
@@ -159,9 +160,25 @@ func uiRoutes(r *mux.Router) {
 
 func middleware(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		rw.Header().Set("Cache-Control", "private, no-cache, must-revalidate")
 		rw.Header().Set("Referrer-Policy", "no-referrer")
 		rw.Header().Set("X-Content-Type-Options", "nosniff")
 		rw.Header().Set("Access-Control-Allow-Origin", "*")
 		h.ServeHTTP(rw, req)
 	})
+}
+
+var immutableFiles = regexp.MustCompile(`\.[0-9a-fA-F]{8,}\.(css|js)$`)
+
+func cacheImmutable(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		if immutableFiles.MatchString(req.URL.Path) {
+			setImmutable(rw)
+		}
+		h.ServeHTTP(rw, req)
+	})
+}
+
+func setImmutable(rw http.ResponseWriter) {
+	rw.Header().Set("Cache-Control", "max-age=2592000, public, immutable")
 }

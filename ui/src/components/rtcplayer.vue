@@ -31,6 +31,7 @@ export default {
       try {
         this.$el.srcObject = this.ms
       } catch (error) {
+        // backwards compat
         this.$el.src = URL.createObjectURL(this.ms)
       }
     }
@@ -40,9 +41,15 @@ export default {
           .then(d => pc.setRemoteDescription(new RTCSessionDescription(d.data)));
       }
     }
-    pc.addTransceiver("audio")
-    pc.addTransceiver("video")
-    pc.createOffer().then(d => this.pc.setLocalDescription(d));
+    var offerArgs = {}
+    try {
+      pc.addTransceiver("audio")
+      pc.addTransceiver("video")
+    } catch (error) {
+      // backwards compat
+      offerArgs = {offerToReceiveVideo: true, offerToReceiveAudio: true}
+    }
+    pc.createOffer(offerArgs).then(d => this.pc.setLocalDescription(d));
   },
   beforeDestroy() {
     this.pc.close();

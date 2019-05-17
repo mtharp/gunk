@@ -91,7 +91,7 @@ func (s *gunkServer) handleThumb(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "", 500)
 		return
 	}
-	rw.Header().Set("Cache-Control", "max-age=2592000, public, immutable")
+	setImmutable(rw)
 	rw.Header().Set("Content-Type", "image/jpeg")
 	rw.Write(jpeg)
 }
