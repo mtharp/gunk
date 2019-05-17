@@ -11,6 +11,8 @@ import (
 	"io"
 	"net/http"
 	"path"
+	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -19,41 +21,89 @@ import (
 )
 
 const (
-	numChunks = 5
+	numChunks = 20
 	assumeKI  = 5 * time.Second
 )
 
 type hlsChunk struct {
-	name       string
-	data       []byte
-	start, dur time.Duration
+	chunks [][]byte
+	mu     sync.Mutex
+	cond   *sync.Cond
+	name   string
+	final  bool
+	start  time.Duration
+	dur    time.Duration
+}
+
+func newChunk(start, initialDur time.Duration) *hlsChunk {
+	c := &hlsChunk{
+		name:  strconv.FormatInt(time.Now().UnixNano(), 36) + ".ts",
+		start: start,
+		dur:   initialDur,
+	}
+	c.cond = &sync.Cond{L: &c.mu}
+	return c
+}
+
+func (c *hlsChunk) Append(d []byte) {
+	if len(d) == 0 {
+		return
+	}
+	buf := make([]byte, len(d))
+	copy(buf, d)
+	c.mu.Lock()
+	c.chunks = append(c.chunks, buf)
+	c.mu.Unlock()
+	c.cond.Broadcast()
+}
+
+func (c *hlsChunk) Close(nextSegment time.Duration) error {
+	c.mu.Lock()
+	c.dur = nextSegment - c.start
+	c.final = true
+	c.mu.Unlock()
+	c.cond.Broadcast()
+	return nil
 }
 
 func (c *hlsChunk) Format() string {
 	return fmt.Sprintf("#EXTINF:%.03f,live\n%s\n", c.dur.Seconds(), c.name)
 }
 
-func newChunk(data []byte, start, dur time.Duration) *hlsChunk {
-	d := make([]byte, len(data))
-	copy(d, data)
-	return &hlsChunk{
-		name:  fmt.Sprintf("%x.ts", time.Now().UnixNano()),
-		data:  d,
-		start: start,
-		dur:   dur,
+func (c *hlsChunk) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	rw.Header().Set("Cache-Control", "max-age=600, public")
+	rw.Header().Set("Content-Type", "video/MP2T")
+	flusher, _ := rw.(http.Flusher)
+	c.mu.Lock()
+	var pos int
+	for {
+		for pos < len(c.chunks) {
+			d := c.chunks[pos]
+			pos++
+			c.mu.Unlock()
+			rw.Write(d)
+			c.mu.Lock()
+		}
+		if c.final {
+			break
+		}
+		if flusher != nil {
+			flusher.Flush()
+		}
+		c.cond.Wait()
 	}
+	c.mu.Unlock()
 }
 
 type HLSPublisher struct {
 	chunks []*hlsChunk
-	last   time.Time
 	seq    int64
 	state  atomic.Value
 }
 
 type hlsState struct {
 	playlist []byte
-	chunks   []hlsChunk
+	chunks   []*hlsChunk
 }
 
 func (p *HLSPublisher) Publish(src av.Demuxer) error {
@@ -62,8 +112,8 @@ func (p *HLSPublisher) Publish(src av.Demuxer) error {
 		return fmt.Errorf("getting streams: %s", err)
 	}
 	buf := new(bytes.Buffer)
-	var chunkMux *ts.Muxer
-	var lastKey time.Duration
+	chunkMux := ts.NewMuxer(buf)
+	var chunk *hlsChunk
 	for {
 		pkt, err := src.ReadPacket()
 		if err == io.EOF {
@@ -71,34 +121,23 @@ func (p *HLSPublisher) Publish(src av.Demuxer) error {
 		} else if err != nil {
 			return fmt.Errorf("reading stream: %s", err)
 		}
+		buf.Reset()
 		if pkt.IsKeyFrame {
-			if chunkMux != nil {
-				chunkMux.WriteTrailer()
-				chunk := newChunk(buf.Bytes(), pkt.Time, pkt.Time-lastKey)
-				p.addChunk(chunk)
-			} else {
-				chunkMux = ts.NewMuxer(buf)
+			if chunk != nil {
+				chunk.Close(pkt.Time)
 			}
-			buf.Reset()
+			chunk = p.addChunk(pkt.Time)
 			chunkMux.WriteHeader(streams)
-			lastKey = pkt.Time
 		}
-		if chunkMux != nil {
+		if chunk != nil {
 			chunkMux.WritePacket(pkt)
+			chunk.Append(buf.Bytes())
 		}
 	}
 	return nil
 }
 
-func (p *HLSPublisher) addChunk(chunk *hlsChunk) {
-	// shift chunks
-	p.chunks = append(p.chunks, chunk)
-	if len(p.chunks) > numChunks {
-		copy(p.chunks, p.chunks[1:])
-		p.chunks = p.chunks[:numChunks]
-	}
-	p.seq++
-	// determine keyframe time
+func (p *HLSPublisher) targetDuration() time.Duration {
 	var maxTime time.Duration
 	for _, chunk := range p.chunks {
 		if chunk.dur > maxTime {
@@ -106,22 +145,34 @@ func (p *HLSPublisher) addChunk(chunk *hlsChunk) {
 		}
 	}
 	maxTime = maxTime.Round(time.Second)
-	// build playlist
-	var b bytes.Buffer
 	if maxTime == 0 {
 		maxTime = assumeKI
 	}
-	fmt.Fprintf(&b, "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:%d\n", int(maxTime.Seconds()))
+	return maxTime
+}
+
+func (p *HLSPublisher) addChunk(start time.Duration) *hlsChunk {
+	initialDur := p.targetDuration()
+	chunk := newChunk(start, initialDur)
+	// shift chunks
+	p.chunks = append(p.chunks, chunk)
+	if len(p.chunks) > numChunks {
+		copy(p.chunks, p.chunks[1:])
+		p.chunks = p.chunks[:numChunks]
+	}
+	p.seq++
+	// build playlist
+	var b bytes.Buffer
+	fmt.Fprintf(&b, "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:%d\n", int(initialDur.Seconds()))
 	fmt.Fprintf(&b, "#EXT-X-MEDIA-SEQUENCE:%d\n", p.seq)
 	for _, chunk := range p.chunks {
 		b.WriteString(chunk.Format())
 	}
 	// publish
-	pubChunks := make([]hlsChunk, len(p.chunks))
-	for i, chunk := range p.chunks {
-		pubChunks[i] = *chunk
-	}
+	pubChunks := make([]*hlsChunk, len(p.chunks))
+	copy(pubChunks, p.chunks)
 	p.state.Store(hlsState{b.Bytes(), pubChunks})
+	return chunk
 }
 
 func (p *HLSPublisher) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -138,9 +189,7 @@ func (p *HLSPublisher) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 	for _, chunk := range state.chunks {
 		if chunk.name == bn {
-			setImmutable(rw)
-			rw.Header().Set("Content-Type", "video/MP2T")
-			rw.Write(chunk.data)
+			chunk.ServeHTTP(rw, req)
 			return
 		}
 	}
