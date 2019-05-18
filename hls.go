@@ -6,10 +6,14 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"log"
 	"net/http"
+	"os"
 	"path"
 	"strconv"
 	"sync"
@@ -18,6 +22,7 @@ import (
 
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/format/ts"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -25,14 +30,23 @@ const (
 	assumeKI  = 5 * time.Second
 )
 
+var bufioPool sync.Pool
+
 type hlsChunk struct {
-	chunks [][]byte
+	// live
 	mu     sync.Mutex
 	cond   *sync.Cond
-	name   string
-	final  bool
-	start  time.Duration
+	chunks [][]byte
 	dur    time.Duration
+	final  bool
+	// fixed at creation
+	start time.Duration
+	name  string
+	// flushed state
+	f         *os.File
+	recycle   *os.File
+	size      int64
+	destroyed bool
 }
 
 func newChunk(start, initialDur time.Duration) *hlsChunk {
@@ -63,7 +77,79 @@ func (c *hlsChunk) Close(nextSegment time.Duration) error {
 	c.final = true
 	c.mu.Unlock()
 	c.cond.Broadcast()
+	go func() {
+		if err := c.flush(); err != nil {
+			log.Println("error: flushing segment to disk:", err)
+		}
+	}()
 	return nil
+}
+
+func (c *hlsChunk) flush() error {
+	c.mu.Lock()
+	f := c.recycle
+	if f == nil {
+		c.mu.Unlock()
+		var err error
+		f, err = ioutil.TempFile("", "")
+		if err != nil {
+			return errors.Wrap(err, "tempfile")
+		}
+		if err := os.Remove(f.Name()); err != nil {
+			f.Close()
+			return errors.Wrap(err, "unlink")
+		}
+	} else {
+		c.recycle = nil
+		c.mu.Unlock()
+		if _, err := f.Seek(0, 0); err != nil {
+			f.Close()
+			return errors.Wrap(err, "rewind")
+		}
+	}
+	b, _ := bufioPool.Get().(*bufio.Writer)
+	if b == nil {
+		b = bufio.NewWriter(f)
+	} else {
+		b.Reset(f)
+	}
+	for _, chunk := range c.chunks {
+		if _, err := b.Write(chunk); err != nil {
+			f.Close()
+			return errors.Wrap(err, "write")
+		}
+		c.size += int64(len(chunk))
+	}
+	if err := b.Flush(); err != nil {
+		f.Close()
+		return errors.Wrap(err, "flush")
+	}
+	b.Reset(nil)
+	bufioPool.Put(b)
+	c.mu.Lock()
+	if c.destroyed {
+		// oops, too late
+		f.Close()
+	} else {
+		c.f = f
+		c.chunks = nil
+	}
+	c.mu.Unlock()
+	return nil
+}
+
+func (c *hlsChunk) Destroy() (recycle *os.File) {
+	c.mu.Lock()
+	recycle = c.f
+	c.f = nil
+	c.destroyed = true
+	if c.recycle != nil {
+		// recycled file didn't get used from last time
+		c.recycle.Close()
+		c.recycle = nil
+	}
+	c.mu.Unlock()
+	return
 }
 
 func (c *hlsChunk) Format() string {
@@ -75,6 +161,12 @@ func (c *hlsChunk) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	rw.Header().Set("Content-Type", "video/MP2T")
 	flusher, _ := rw.(http.Flusher)
 	c.mu.Lock()
+	if c.f != nil {
+		c.mu.Unlock()
+		rw.Header().Set("Content-Length", strconv.FormatInt(c.size, 10))
+		io.Copy(rw, io.NewSectionReader(c.f, 0, c.size))
+		return
+	}
 	var pos int
 	for {
 		for pos < len(c.chunks) {
@@ -157,6 +249,7 @@ func (p *HLSPublisher) addChunk(start time.Duration) *hlsChunk {
 	// shift chunks
 	p.chunks = append(p.chunks, chunk)
 	if len(p.chunks) > numChunks {
+		chunk.recycle = p.chunks[0].Destroy()
 		copy(p.chunks, p.chunks[1:])
 		p.chunks = p.chunks[:numChunks]
 	}

@@ -18,6 +18,7 @@ require (
 	github.com/pion/ice v0.2.8 // indirect
 	github.com/pion/rtp v1.1.2
 	github.com/pion/webrtc/v2 v2.0.14
+	github.com/pkg/errors v0.8.1
 	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/shopspring/decimal v0.0.0-20180709203117-cd690d0c9e24 // indirect
 	golang.org/x/crypto v0.0.0-20190513172903-22d7a77e9e5f
