@@ -199,6 +199,7 @@ type hlsState struct {
 }
 
 func (p *HLSPublisher) Publish(src av.Demuxer) error {
+	defer p.destroy()
 	streams, err := src.Streams()
 	if err != nil {
 		return fmt.Errorf("getting streams: %s", err)
@@ -266,6 +267,15 @@ func (p *HLSPublisher) addChunk(start time.Duration) *hlsChunk {
 	copy(pubChunks, p.chunks)
 	p.state.Store(hlsState{b.Bytes(), pubChunks})
 	return chunk
+}
+
+func (p *HLSPublisher) destroy() {
+	for _, chunk := range p.chunks {
+		if f := chunk.Destroy(); f != nil {
+			f.Close()
+		}
+	}
+	p.chunks = nil
 }
 
 func (p *HLSPublisher) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
