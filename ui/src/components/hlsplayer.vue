@@ -27,6 +27,7 @@ export default {
       responsive: true,
       muted: true,
       controls: true,
+      liveui: true,
     })
     this.player.ready(() => this.player.play())
   },
