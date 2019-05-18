@@ -7,6 +7,7 @@ package main
 
 import (
 	"context"
+	"io"
 	"log"
 	"path"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/nareix/joy4/av/pktque"
 	"github.com/nareix/joy4/av/pubsub"
 	"github.com/nareix/joy4/format/rtmp"
+	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -51,7 +53,7 @@ func (s *gunkServer) handleRTMP(conn *rtmp.Conn) {
 	opusq := pubsub.NewQueue()
 	eg.Go(func() error {
 		defer opusq.Close()
-		return opus.Convert(q.Latest(), opusq, s.opusBitrate)
+		return errors.Wrap(opus.Convert(q.Latest(), opusq, s.opusBitrate), "opus conversion")
 	})
 
 	s.mu.Lock()
@@ -64,10 +66,11 @@ func (s *gunkServer) handleRTMP(conn *rtmp.Conn) {
 
 	log.Printf("[ingest] publish of %s started from %s on behalf of user %s", chname, remote, userID)
 	eg.Go(func() error {
-		return hls.Publish(q.Latest())
+		return errors.Wrap(hls.Publish(q.Latest()), "hls publish")
 	})
 	eg.Go(func() error {
-		return avutil.CopyPackets(q, fm)
+		defer q.Close()
+		return errors.Wrap(noeof(avutil.CopyPackets(q, fm)), "demuxer")
 	})
 	if err := eg.Wait(); err != nil {
 		log.Printf("[ingest] error: on stream %s from %s: %s", conn.URL, remote, err)
@@ -78,4 +81,11 @@ func (s *gunkServer) handleRTMP(conn *rtmp.Conn) {
 		delete(s.channels, chname)
 	}
 	s.mu.Unlock()
+}
+
+func noeof(err error) error {
+	if err == io.EOF {
+		return nil
+	}
+	return err
 }
