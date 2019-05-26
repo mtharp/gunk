@@ -25,8 +25,7 @@ new Vue({
   router,
   render: h => h(App),
   data: {
-    channels: null,
-    liveChannels: null,
+    channels: {},
     user: {
       id: null,
       username: null,
@@ -39,16 +38,7 @@ new Vue({
   methods: {
     updateChannels() {
       axios.get("/channels.json")
-        .then(response => {
-          let live = new Array();
-          for (let ch of response.data) {
-            if (ch.live) {
-              live.push(ch)
-            }
-          }
-          this.channels = response.data
-          this.liveChannels = live
-        })
+        .then(response => this.channels = response.data)
     },
     updateUser() {
       axios.get("/oauth2/user")
@@ -64,14 +54,20 @@ new Vue({
           this.updateUser()
         })
     },
-    navChannel(ch) {
-      return {name: 'watch', params: {channel: ch.name}}
+    navChannel(name) {
+      return {name: 'watch', params: {channel: name}}
     },
   },
   computed: {
     loggedIn() { return this.user.id !== null && this.user.id !== "" },
-    avatarURL() {
-      return "/avatars/" + this.user.id + "/" + this.user.avatar + ".png?size=32";
+    liveChannels() {
+      let live = new Array()
+      for (let ch of Object.values(this.channels)) {
+        if (ch.live) {
+          live.push(ch.name)
+        }
+      }
+      return live.sort()
     },
   },
   mounted() {

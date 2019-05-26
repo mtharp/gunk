@@ -5,7 +5,7 @@
       class="channel-card"
       >
       <router-link :to="$root.navChannel(ch)">
-        <img :src="thumbURL(ch)" />
+        <img :src="ch.thumb" />
         <div v-if="!ch.live" class="channel-shade">OFFLINE</div>
         <div class="channel-card-title">
           <h1>{{ch.name}}</h1>
@@ -22,8 +22,5 @@
 <script>
 export default {
   name: 'home',
-  methods: {
-    thumbURL(ch) { return "/thumbs/" + encodeURIComponent(ch.name) + "/" + ch.last + ".jpg" },
-  },
 }
 </script>

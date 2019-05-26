@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx"
@@ -61,19 +62,41 @@ func (s *gunkServer) handleTS(rw http.ResponseWriter, req *http.Request) {
 	avutil.CopyFile(muxer, ch.queue.Latest())
 }
 
-func (s *gunkServer) handleChannels(rw http.ResponseWriter, req *http.Request) {
+func (s *gunkServer) listChannels() ([]*channelInfo, error) {
 	infos, err := listChannels()
+	if err != nil {
+		return nil, err
+	}
+	for _, info := range infos {
+		if err := s.populateChannel(info); err != nil {
+			return nil, err
+		}
+	}
+	s.mu.Lock()
+	for _, info := range infos {
+		if s.channels[info.Name] != nil {
+			info.Live = true
+		}
+	}
+	s.mu.Unlock()
+	return infos, nil
+}
+
+func (s *gunkServer) populateChannel(info *channelInfo) error {
+	u, err := s.router.Get("thumbs").URL("channel", info.Name, "timestamp", strconv.FormatInt(info.Last, 10))
+	if err != nil {
+		return err
+	}
+	info.Thumb = u.String()
+	return nil
+}
+
+func (s *gunkServer) handleChannels(rw http.ResponseWriter, req *http.Request) {
+	infos, err := s.listChannels()
 	if err != nil {
 		log.Printf("error: listing channels: %s", err)
 		http.Error(rw, "", 500)
 	}
-	s.mu.Lock()
-	for i, info := range infos {
-		if s.channels[info.Name] != nil {
-			infos[i].Live = true
-		}
-	}
-	s.mu.Unlock()
 	blob, _ := json.Marshal(infos)
 	rw.Header().Set("Content-Type", "application/json")
 	rw.Write(blob)

@@ -11,7 +11,7 @@
           <b-nav-item to="/">Home</b-nav-item>
           <b-nav-item to="/mychannels" v-if="$root.loggedIn">My Channels</b-nav-item>
           <b-nav-text>&bull; Watch:</b-nav-text>
-          <b-nav-item v-for="ch in $root.liveChannels" :key="ch.name" :to="$root.navChannel(ch)">{{ch.name}}</b-nav-item>
+          <b-nav-item v-for="name in $root.liveChannels" :key="name" :to="$root.navChannel(name)">{{name}}</b-nav-item>
         </b-navbar-nav>
         <b-navbar-nav class="ml-auto">
           <b-nav-text v-if="$route.name == 'watch'">
@@ -26,7 +26,7 @@
           </b-nav-form>
           <b-nav-form v-if="$root.loggedIn">
             <b-img
-              :src="$root.avatarURL"
+              :src="$root.user.avatar"
               width="32"
               height="32"
               rounded="circle"

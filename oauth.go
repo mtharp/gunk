@@ -35,6 +35,9 @@ func (s *gunkServer) viewUser(rw http.ResponseWriter, req *http.Request) {
 	if err := s.unseal(req, s.loginCookie, &info); err != nil {
 		info = loginInfo{}
 	}
+	if info.Avatar != "" {
+		info.Avatar = "/avatars/" + info.ID + "/" + info.Avatar + ".png"
+	}
 	blob, _ := json.Marshal(info)
 	rw.Header().Set("Content-Type", "application/json")
 	rw.Write(blob)

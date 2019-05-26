@@ -24,10 +24,10 @@ const (
 	grabInterval = 10 * time.Second
 )
 
-func grabFrames(channelName string, dm av.Demuxer) error {
+func grabFrames(channelName string, dm av.Demuxer) (<-chan time.Time, error) {
 	streams, err := dm.Streams()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	vidIdx := -1
 	var vidCodec h264parser.CodecData
@@ -38,9 +38,11 @@ func grabFrames(channelName string, dm av.Demuxer) error {
 		}
 	}
 	if vidIdx < 0 {
-		return errors.New("no h264 stream found")
+		return nil, errors.New("no h264 stream found")
 	}
+	grabch := make(chan time.Time, 1)
 	go func() {
+		defer close(grabch)
 		var buf bytes.Buffer
 		var keyTime time.Duration
 		var lastGrab time.Time
@@ -49,7 +51,7 @@ func grabFrames(channelName string, dm av.Demuxer) error {
 			if err == io.EOF {
 				return
 			} else if err != nil {
-				log.Println("error: in frame grabber: %s", err)
+				log.Printf("error: in frame grabber: %s", err)
 				return
 			}
 			if int(pkt.Idx) != vidIdx {
@@ -61,6 +63,10 @@ func grabFrames(channelName string, dm av.Demuxer) error {
 						log.Println("error: making thumbnail:", err)
 					}
 					lastGrab = time.Now()
+					select {
+					case grabch <- lastGrab:
+					default:
+					}
 				}
 				buf.Reset()
 			}
@@ -71,7 +77,7 @@ func grabFrames(channelName string, dm av.Demuxer) error {
 			keyTime = pkt.Time
 		}
 	}()
-	return nil
+	return grabch, nil
 }
 
 func makeFrame(channelName string, cd h264parser.CodecData, raw []byte) error {

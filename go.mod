@@ -7,6 +7,7 @@ require (
 	github.com/golang/mock v1.3.1 // indirect
 	github.com/golang/protobuf v1.3.1 // indirect
 	github.com/gorilla/mux v1.7.1
+	github.com/gorilla/websocket v1.4.0
 	github.com/jackc/fake v0.0.0-20150926172116-812a484cc733 // indirect
 	github.com/jackc/pgx v3.4.0+incompatible
 	github.com/kr/pretty v0.1.0 // indirect

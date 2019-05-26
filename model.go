@@ -197,19 +197,20 @@ func (s *gunkServer) viewDefsDelete(rw http.ResponseWriter, req *http.Request) {
 }
 
 type channelInfo struct {
-	Name string `json:"name"`
-	Live bool   `json:"live"`
-	Last int64  `json:"last"`
+	Name  string `json:"name"`
+	Live  bool   `json:"live"`
+	Last  int64  `json:"last"`
+	Thumb string `json:"thumb"`
 }
 
-func listChannels() (ret []channelInfo, err error) {
+func listChannels() (ret []*channelInfo, err error) {
 	rows, err := db.Query("SELECT name, updated FROM thumbs ORDER BY greatest(now() - updated, '1 minute'::interval) ASC, 1 ASC")
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var info channelInfo
+		info := new(channelInfo)
 		var last time.Time
 		if err := rows.Scan(&info.Name, &last); err != nil {
 			return nil, err

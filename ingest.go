@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	"path"
+	"time"
 
 	"github.com/mtharp/gunk/opus"
 	"github.com/nareix/joy4/av/avutil"
@@ -46,7 +47,8 @@ func (s *gunkServer) handleRTMP(conn *rtmp.Conn) {
 		q.Close()
 	}()
 	hls := new(HLSPublisher)
-	if err := grabFrames(chname, q.Latest()); err != nil {
+	grabch, err := grabFrames(chname, q.Latest())
+	if err != nil {
 		log.Printf("[ingest] error: setting up frame grabber on %s from %s: %s", conn.URL, remote, err)
 		return
 	}
@@ -72,6 +74,14 @@ func (s *gunkServer) handleRTMP(conn *rtmp.Conn) {
 		defer q.Close()
 		return errors.Wrap(noeof(avutil.CopyPackets(q, fm)), "demuxer")
 	})
+	eg.Go(func() error {
+		for thumbTime := range grabch {
+			if err := s.wsChannelLive(chname, true, thumbTime); err != nil {
+				log.Println("warning:", err)
+			}
+		}
+		return nil
+	})
 	if err := eg.Wait(); err != nil {
 		log.Printf("[ingest] error: on stream %s from %s: %s", conn.URL, remote, err)
 	}
@@ -81,6 +91,9 @@ func (s *gunkServer) handleRTMP(conn *rtmp.Conn) {
 		delete(s.channels, chname)
 	}
 	s.mu.Unlock()
+	if err := s.wsChannelLive(chname, false, time.Time{}); err != nil {
+		log.Println("warning:", err)
+	}
 }
 
 func noeof(err error) error {

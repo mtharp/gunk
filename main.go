@@ -33,6 +33,7 @@ type gunkServer struct {
 	channels map[string]*channel
 	mu       sync.Mutex
 
+	router      *mux.Router
 	oauth       *oauth2.Config
 	rtmp        *rtmp.Server
 	rtmpBase    string
@@ -41,18 +42,21 @@ type gunkServer struct {
 	cookieSecure             bool
 	stateCookie, loginCookie string
 	key                      [32]byte
+
+	listeners map[listener]struct{}
 }
 
 func main() {
 	base := strings.TrimSuffix(os.Getenv("BASE_URL"), "/")
 	u, err := url.Parse(base)
 	if err != nil {
-		log.Fatalln("error: in BASE_URL: %s", err)
+		log.Fatalf("error: in BASE_URL: %s", err)
 	}
 	s := &gunkServer{
-		channels: make(map[string]*channel),
-		rtmp:     &rtmp.Server{},
-		rtmpBase: "rtmp://" + u.Hostname() + "/live",
+		channels:  make(map[string]*channel),
+		listeners: make(map[listener]struct{}),
+		rtmp:      &rtmp.Server{},
+		rtmpBase:  "rtmp://" + u.Hostname() + "/live",
 	}
 	s.oauth = &oauth2.Config{
 		RedirectURL:  base + "/oauth2/cb",
@@ -99,6 +103,8 @@ func main() {
 	eg.Go(s.rtmp.ListenAndServe)
 
 	r := mux.NewRouter()
+	s.router = r
+	r.HandleFunc("/ws", s.handleWS)
 	// video
 	r.HandleFunc("/live/{channel}.ts", s.handleTS).Methods("GET")
 	r.HandleFunc("/hls/{channel}/{filename}", s.handleHLS).Methods("GET")
@@ -108,7 +114,7 @@ func main() {
 	uiRoutes(r)
 	r.HandleFunc("/", func(rw http.ResponseWriter, req *http.Request) { http.ServeFile(rw, req, "./index.html") }).Methods("GET")
 	r.HandleFunc("/channels.json", s.handleChannels)
-	r.HandleFunc("/thumbs/{channel}/{timestamp}.jpg", s.handleThumb)
+	r.HandleFunc("/thumbs/{channel}/{timestamp}.jpg", s.handleThumb).Name("thumbs")
 	r.PathPrefix("/node_modules/").Handler(http.StripPrefix("/node_modules/", http.FileServer(http.Dir("./node_modules"))))
 	// login
 	r.HandleFunc("/oauth2/user", s.viewUser).Methods("GET")
@@ -146,6 +152,7 @@ func uiRoutes(r *mux.Router) {
 		handler.ServeHTTP(rw, req)
 	})
 	r.Handle("/", indexHandler)
+	r.Handle("/mychannels", indexHandler)
 	r.Handle("/watch/{channel}", indexHandler)
 	r.NotFoundHandler = cacheImmutable(handler)
 
