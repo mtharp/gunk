@@ -197,10 +197,11 @@ func (s *gunkServer) viewDefsDelete(rw http.ResponseWriter, req *http.Request) {
 }
 
 type channelInfo struct {
-	Name  string `json:"name"`
-	Live  bool   `json:"live"`
-	Last  int64  `json:"last"`
-	Thumb string `json:"thumb"`
+	Name    string `json:"name"`
+	Live    bool   `json:"live"`
+	Last    int64  `json:"last"`
+	Thumb   string `json:"thumb"`
+	LiveURL string `json:"live_url"`
 }
 
 func listChannels() (ret []*channelInfo, err error) {

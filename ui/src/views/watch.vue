@@ -22,6 +22,14 @@ export default {
     'channel',
   ],
   computed: {
+    ch() {
+      for (let ch of Object.values(this.$root.channels)) {
+        if (ch.name == this.channel) {
+          return ch
+        }
+      }
+      return null
+    },
     baseURL() {
       let base = window.location.protocol + "//" + window.location.hostname
       if (window.location.port != "") {
@@ -30,7 +38,17 @@ export default {
       return base
     },
     hlsURL() { return this.baseURL + "/hls/" + encodeURIComponent(this.channel) + "/index.m3u8" },
-    liveURL() { return this.baseURL + "/live/" + encodeURIComponent(this.channel) + ".ts" },
+    liveURL() {
+      let ch = this.ch
+      if (ch === null) {
+        return null
+      }
+      let u = ch.live_url
+      if (u[0] == '/') {
+        return this.baseURL + u
+      }
+      return u
+    }
   },
 }
 </script>

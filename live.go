@@ -88,6 +88,11 @@ func (s *gunkServer) populateChannel(info *channelInfo) error {
 		return err
 	}
 	info.Thumb = u.String()
+	liveU, err := s.router.Get("live").URL("channel", info.Name)
+	if s.liveBase != nil {
+		liveU = s.liveBase.ResolveReference(liveU)
+	}
+	info.LiveURL = liveU.String()
 	return nil
 }
 

@@ -4,7 +4,7 @@
       v-for="ch in $root.channels" :key="ch.name"
       class="channel-card"
       >
-      <router-link :to="$root.navChannel(ch)">
+      <router-link :to="$root.navChannel(ch.name)">
         <img :src="ch.thumb" />
         <div v-if="!ch.live" class="channel-shade">OFFLINE</div>
         <div class="channel-card-title">

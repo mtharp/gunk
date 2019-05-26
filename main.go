@@ -37,6 +37,7 @@ type gunkServer struct {
 	oauth       *oauth2.Config
 	rtmp        *rtmp.Server
 	rtmpBase    string
+	liveBase    *url.URL
 	opusBitrate int
 
 	cookieSecure             bool
@@ -88,6 +89,12 @@ func main() {
 	if v := os.Getenv("RTMP_URL"); v != "" {
 		s.rtmpBase = strings.TrimSuffix(v, "/") + "/live"
 	}
+	if v := os.Getenv("LIVE_URL"); v != "" {
+		s.liveBase, err = url.Parse(v)
+		if err != nil {
+			log.Fatalln("LIVE_URL:", err)
+		}
+	}
 	if v, _ := strconv.Atoi(os.Getenv("OPUS_BITRATE")); v > 0 {
 		s.opusBitrate = v
 	} else {
@@ -106,7 +113,7 @@ func main() {
 	s.router = r
 	r.HandleFunc("/ws", s.handleWS)
 	// video
-	r.HandleFunc("/live/{channel}.ts", s.handleTS).Methods("GET")
+	r.HandleFunc("/live/{channel}.ts", s.handleTS).Methods("GET").Name("live")
 	r.HandleFunc("/hls/{channel}/{filename}", s.handleHLS).Methods("GET")
 	// RTC
 	r.HandleFunc("/sdp/{channel}", s.handleRTC).Methods("POST")
