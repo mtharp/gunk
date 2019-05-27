@@ -7,6 +7,7 @@ package main
 
 import (
 	"log"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -17,6 +18,7 @@ import (
 	"sync"
 
 	"github.com/gorilla/mux"
+	"github.com/mtharp/gunk/rtsp"
 	"github.com/nareix/joy4/av/pubsub"
 	"github.com/nareix/joy4/format/rtmp"
 	"golang.org/x/oauth2"
@@ -39,6 +41,7 @@ type gunkServer struct {
 	rtmpBase    string
 	liveBase    *url.URL
 	opusBitrate int
+	rtsp        *rtsp.Server
 
 	cookieSecure             bool
 	stateCookie, loginCookie string
@@ -108,6 +111,25 @@ func main() {
 
 	s.rtmp.HandlePublish = s.handleRTMP
 	eg.Go(s.rtmp.ListenAndServe)
+	if v := os.Getenv("LISTEN_RTSP"); v != "" {
+		lis, err := net.Listen("tcp", v)
+		if err != nil {
+			log.Fatalln("error:", err)
+		}
+		v2 := os.Getenv("LISTEN_RTP")
+		if v2 == "" {
+			v2 = ":22002"
+		}
+		rtpSock, err := net.ListenPacket("udp", v2)
+		if err != nil {
+			log.Fatalln("error:", err)
+		}
+		s.rtsp = &rtsp.Server{
+			Source:    s.getRTSPSource,
+			RTPSocket: rtpSock,
+		}
+		eg.Go(func() error { return s.rtsp.Listen(lis) })
+	}
 
 	r := mux.NewRouter()
 	s.router = r

@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"time"
 
+	"github.com/mtharp/gunk/h264util"
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/codec/h264parser"
 )
@@ -73,7 +74,7 @@ func grabFrames(channelName string, dm av.Demuxer) (<-chan time.Time, error) {
 			if !pkt.IsKeyFrame {
 				continue
 			}
-			writeAnnexBPacket(&buf, pkt, vidCodec)
+			h264util.WriteAnnexBPacket(&buf, pkt, vidCodec)
 			keyTime = pkt.Time
 		}
 	}()

@@ -18,6 +18,7 @@ require (
 	github.com/onsi/gomega v1.5.0 // indirect
 	github.com/pion/ice v0.3.1 // indirect
 	github.com/pion/rtp v1.1.2
+	github.com/pion/sdp v1.3.0
 	github.com/pion/webrtc/v2 v2.0.16
 	github.com/pkg/errors v0.8.1
 	github.com/satori/go.uuid v1.2.0 // indirect

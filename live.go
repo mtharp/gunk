@@ -10,9 +10,12 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx"
+	"github.com/mtharp/gunk/rtsp"
+	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/av/avutil"
 	"github.com/nareix/joy4/format/ts"
 )
@@ -60,6 +63,21 @@ func (s *gunkServer) handleTS(rw http.ResponseWriter, req *http.Request) {
 	rw.Header().Set("Transfer-Encoding", "chunked")
 	muxer := ts.NewMuxer(rw)
 	avutil.CopyFile(muxer, ch.queue.Latest())
+}
+
+func (s *gunkServer) getRTSPSource(req *rtsp.Request) (av.Demuxer, error) {
+	chname := req.URL.Path
+	if strings.HasPrefix(chname, "/") {
+		chname = chname[1:]
+	}
+	chname = strings.Split(chname, "/")[0]
+	s.mu.Lock()
+	ch := s.channels[chname]
+	s.mu.Unlock()
+	if ch == nil {
+		return nil, rtsp.ErrNotFound
+	}
+	return ch.opusq.Latest(), nil
 }
 
 func (s *gunkServer) listChannels() ([]*channelInfo, error) {

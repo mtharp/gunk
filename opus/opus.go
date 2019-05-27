@@ -80,6 +80,8 @@ func (d CodecData) PacketDuration(pkt []byte) (time.Duration, error) {
 	return time.Duration(numFr) * opusFrameTimes[config], nil
 }
 
+// Convert the audio track from src to opus and write the result to dest.
+// Video tracks are copied as-is.
 func Convert(src av.Demuxer, dest *pubsub.Queue, bitrate int) error {
 	streams, err := src.Streams()
 	if err != nil {
