@@ -85,6 +85,7 @@ func handleSDP(rw http.ResponseWriter, req *http.Request, queue *pubsub.Queue) e
 }
 
 func (s *rtcSender) setupTracks(streams []av.CodecData, offer webrtc.SessionDescription) (*webrtc.SessionDescription, error) {
+	ssrc := rand.Uint32()
 	for i, stream := range streams {
 		var codec *webrtc.RTPCodec
 		switch stream.Type() {
@@ -96,7 +97,7 @@ func (s *rtcSender) setupTracks(streams []av.CodecData, offer webrtc.SessionDesc
 			return nil, fmt.Errorf("unsupported codec %s for RTSP", stream.Type())
 		}
 		name := codec.Type.String()
-		track, err := s.pc.NewTrack(codec.PayloadType, rand.Uint32(), name, name)
+		track, err := s.pc.NewTrack(codec.PayloadType, ssrc, name, name)
 		if err != nil {
 			return nil, err
 		}
@@ -108,6 +109,7 @@ func (s *rtcSender) setupTracks(streams []av.CodecData, offer webrtc.SessionDesc
 			Codec:     codec,
 			Track:     track,
 		}
+		ssrc++
 	}
 	// build answer
 	if err := s.pc.SetRemoteDescription(offer); err != nil {

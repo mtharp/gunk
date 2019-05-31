@@ -27,6 +27,10 @@ type CodecData struct {
 	channels int
 }
 
+func NewCodecData(channels int) *CodecData {
+	return &CodecData{channels: channels}
+}
+
 func (d CodecData) Type() av.CodecType {
 	return OPUS
 }

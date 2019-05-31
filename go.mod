@@ -10,7 +10,7 @@ require (
 	github.com/gorilla/websocket v1.4.0
 	github.com/jackc/fake v0.0.0-20150926172116-812a484cc733 // indirect
 	github.com/jackc/pgx v3.4.0+incompatible
-	github.com/kr/pretty v0.1.0 // indirect
+	github.com/kr/pretty v0.1.0
 	github.com/lib/pq v1.1.1 // indirect
 	github.com/lucas-clemente/quic-go v0.11.1 // indirect
 	github.com/nareix/joy4 v0.0.0-20181022032202-3ddbc8f9d431

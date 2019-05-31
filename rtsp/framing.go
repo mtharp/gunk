@@ -26,6 +26,13 @@ func ToTS(t time.Duration, clockRate uint64) uint64 {
 	return ts
 }
 
+// FromTS converts a tick timestamp to a duration
+func FromTS(ts, clockRate uint64) time.Duration {
+	hi, lo := bits.Mul64(uint64(ts), uint64(time.Second))
+	t, _ := bits.Div64(hi, lo, clockRate)
+	return time.Duration(t)
+}
+
 type framer struct {
 	ts  uint64
 	got bool

@@ -14,6 +14,7 @@ import (
 	"net"
 	"net/textproto"
 	"net/url"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -30,7 +31,7 @@ type Server struct {
 
 type SourceFunc func(*Request) (av.Demuxer, error)
 
-func (s *Server) Listen(lis net.Listener) error {
+func (s *Server) Serve(lis net.Listener) error {
 	for {
 		conn, err := lis.Accept()
 		if err != nil {
@@ -59,7 +60,15 @@ type Conn struct {
 }
 
 func (c *Conn) serve() {
-	defer c.conn.Close()
+	defer func() {
+		if r := recover(); r != nil {
+			const size = 64 << 10
+			buf := make([]byte, size)
+			buf = buf[:runtime.Stack(buf, false)]
+			log.Printf("error: panic in handler for RTSP connection %s: %s\n%s\n", c.conn.RemoteAddr(), r, string(buf))
+		}
+		c.conn.Close()
+	}()
 	c.ctx, c.cancel = context.WithCancel(context.Background())
 	defer c.cancel()
 	c.tpc = textproto.NewConn(c.conn)

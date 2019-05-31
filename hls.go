@@ -202,7 +202,7 @@ func (p *HLSPublisher) Publish(src av.Demuxer) error {
 	defer p.destroy()
 	streams, err := src.Streams()
 	if err != nil {
-		return fmt.Errorf("getting streams: %s", err)
+		return errors.Wrap(err, "getting stream info")
 	}
 	buf := new(bytes.Buffer)
 	chunkMux := ts.NewMuxer(buf)
@@ -212,7 +212,7 @@ func (p *HLSPublisher) Publish(src av.Demuxer) error {
 		if err == io.EOF {
 			break
 		} else if err != nil {
-			return fmt.Errorf("reading stream: %s", err)
+			return errors.Wrap(err, "reading stream")
 		}
 		buf.Reset()
 		if pkt.IsKeyFrame {
@@ -220,7 +220,9 @@ func (p *HLSPublisher) Publish(src av.Demuxer) error {
 				chunk.Close(pkt.Time)
 			}
 			chunk = p.addChunk(pkt.Time)
-			chunkMux.WriteHeader(streams)
+			if err := chunkMux.WriteHeader(streams); err != nil {
+				return errors.Wrap(err, "writing segment header")
+			}
 		}
 		if chunk != nil {
 			chunkMux.WritePacket(pkt)

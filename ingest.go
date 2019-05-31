@@ -9,11 +9,11 @@ import (
 	"context"
 	"io"
 	"log"
-	"path"
+	"net"
 	"time"
 
 	"github.com/mtharp/gunk/opus"
-	"github.com/nareix/joy4/av/avutil"
+	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/av/pktque"
 	"github.com/nareix/joy4/av/pubsub"
 	"github.com/nareix/joy4/format/rtmp"
@@ -23,22 +23,28 @@ import (
 
 func (s *gunkServer) handleRTMP(conn *rtmp.Conn) {
 	defer conn.Close()
-	remote := conn.NetConn().RemoteAddr()
+	remote := conn.NetConn().RemoteAddr().(*net.TCPAddr).IP.String()
 	fm := &pktque.FilterDemuxer{
 		Demuxer: conn,
 		Filter:  &pktque.FixTime{MakeIncrement: true},
 	}
-	streams, err := fm.Streams()
+	userID, chname, err := verifyRTMP(conn.URL)
 	if err != nil {
-		log.Printf("[ingest] error: reading streams on %s from %s: %s", conn.URL, remote, err)
+		log.Printf("[rtmp] error: %s from %s: %s", conn.URL, remote, err)
 		return
 	}
-	userID := verifyChannel(conn.URL)
-	if userID == "" {
-		log.Printf("[ingest] error: stream not found or incorrect key for %s from %s", conn.URL, remote)
-		return
+	log.Printf("[rtmp] user %s started publishing to %s from %s", userID, chname, remote)
+	if err := s.handleIngest(chname, userID, remote, fm); err != nil {
+		log.Printf("[rtmp] error: %s from %s: %s", conn.URL, remote, err)
 	}
-	chname := path.Base(conn.URL.Path)
+	log.Printf("[rtmp] publish of %s stopped", chname)
+}
+
+func (s *gunkServer) handleIngest(chname, userID, remote string, src av.Demuxer) error {
+	streams, err := src.Streams()
+	if err != nil {
+		return errors.Wrap(err, "reading streams")
+	}
 	q := pubsub.NewQueue()
 	q.WriteHeader(streams)
 	eg, ctx := errgroup.WithContext(context.Background())
@@ -46,18 +52,23 @@ func (s *gunkServer) handleRTMP(conn *rtmp.Conn) {
 		<-ctx.Done()
 		q.Close()
 	}()
-	hls := new(HLSPublisher)
+	// grab keyframes for thumbnail
 	grabch, err := grabFrames(chname, q.Latest())
 	if err != nil {
-		log.Printf("[ingest] error: setting up frame grabber on %s from %s: %s", conn.URL, remote, err)
-		return
+		return errors.Wrap(err, "setting up frame grabber")
 	}
-	opusq := pubsub.NewQueue()
-	eg.Go(func() error {
-		defer opusq.Close()
-		return errors.Wrap(opus.Convert(q.Latest(), opusq, s.opusBitrate), "opus conversion")
-	})
+	opusq := q
+	if audioType(streams) != opus.OPUS {
+		// convert audio to opus for webrtc
+		opusq = pubsub.NewQueue()
+		eg.Go(func() error {
+			defer opusq.Close()
+			return errors.Wrap(opus.Convert(q.Latest(), opusq, s.opusBitrate), "opus conversion")
+		})
+	}
 
+	// go live
+	hls := new(HLSPublisher)
 	s.mu.Lock()
 	if existing := s.channels[chname]; existing != nil {
 		existing.queue.Close()
@@ -65,16 +76,39 @@ func (s *gunkServer) handleRTMP(conn *rtmp.Conn) {
 	ch := &channel{q, opusq, hls}
 	s.channels[chname] = ch
 	s.mu.Unlock()
+	defer func() {
+		s.mu.Lock()
+		if s.channels[chname] == ch {
+			delete(s.channels, chname)
+		}
+		s.mu.Unlock()
+		if err := s.wsChannelLive(chname, false, time.Time{}); err != nil {
+			log.Printf("[ingest] warning: %s: %s", chname, err)
+		}
+	}()
 
-	log.Printf("[ingest] publish of %s started from %s on behalf of user %s", chname, remote, userID)
+	// start outputs
 	eg.Go(func() error {
 		return errors.Wrap(hls.Publish(q.Latest()), "hls publish")
 	})
 	eg.Go(func() error {
+
 		defer q.Close()
-		return errors.Wrap(noeof(avutil.CopyPackets(q, fm)), "demuxer")
+		for ctx.Err() == nil {
+			pkt, err := src.ReadPacket()
+			if err == io.EOF {
+				break
+			} else if err != nil {
+				return err
+			}
+			if err := q.WritePacket(pkt); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 	eg.Go(func() error {
+		// notify ws clients when thumbnail is updated
 		for thumbTime := range grabch {
 			if err := s.wsChannelLive(chname, true, thumbTime); err != nil {
 				log.Println("warning:", err)
@@ -82,18 +116,7 @@ func (s *gunkServer) handleRTMP(conn *rtmp.Conn) {
 		}
 		return nil
 	})
-	if err := eg.Wait(); err != nil {
-		log.Printf("[ingest] error: on stream %s from %s: %s", conn.URL, remote, err)
-	}
-	log.Printf("[ingest] publish of %s stopped from %s on behalf of user %s", chname, remote, userID)
-	s.mu.Lock()
-	if s.channels[chname] == ch {
-		delete(s.channels, chname)
-	}
-	s.mu.Unlock()
-	if err := s.wsChannelLive(chname, false, time.Time{}); err != nil {
-		log.Println("warning:", err)
-	}
+	return eg.Wait()
 }
 
 func noeof(err error) error {
@@ -101,4 +124,13 @@ func noeof(err error) error {
 		return nil
 	}
 	return err
+}
+
+func audioType(streams []av.CodecData) av.CodecType {
+	for _, stream := range streams {
+		if stream.Type().IsAudio() {
+			return stream.Type()
+		}
+	}
+	return 0
 }

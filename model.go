@@ -6,9 +6,12 @@
 package main
 
 import (
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha512"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"io/ioutil"
 	"log"
@@ -85,17 +88,39 @@ func deleteChannel(userID, name string) error {
 	return err
 }
 
-func verifyChannel(u *url.URL) (userID string) {
-	name := path.Base(u.Path)
+var ErrUserNotFound = errors.New("user not found or wrong key")
+
+func verifyRTMP(u *url.URL) (userID, channelName string, err error) {
+	channelName = path.Base(u.Path)
 	key := u.Query().Get("key")
-	row := db.QueryRow("SELECT user_id FROM channel_defs WHERE name = $1 AND key = $2", name, key)
-	if err := row.Scan(&userID); err == pgx.ErrNoRows {
-		return ""
-	} else if err != nil {
-		log.Printf("error: querying database: %s", err)
-		return ""
+	row := db.QueryRow("SELECT user_id FROM channel_defs WHERE name = $1 AND key = $2", channelName, key)
+	if err = row.Scan(&userID); err != nil {
+		if err == pgx.ErrNoRows {
+			err = ErrUserNotFound
+		}
+		return
 	}
-	return userID
+	return
+}
+
+func verifyFTL(channelID string, nonce, hmacProvided []byte) (userID, channelName string, err error) {
+	row := db.QueryRow("SELECT user_id, name, key FROM channel_defs WHERE ftl_id = $1", channelID)
+	var key string
+	if err = row.Scan(&userID, &channelName, &key); err != nil {
+		if err == pgx.ErrNoRows {
+			err = ErrUserNotFound
+		}
+		return
+	}
+	hm := hmac.New(sha512.New, []byte(key))
+	hm.Write(nonce)
+	expected := hm.Sum(nil)
+	if !hmac.Equal(expected, hmacProvided) {
+		log.Printf("error: hmac digest mismatch for FTL channel %s", channelName)
+		err = ErrUserNotFound
+		return
+	}
+	return
 }
 
 func getThumb(channelName string) (d []byte, err error) {

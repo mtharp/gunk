@@ -18,6 +18,7 @@ import (
 	"sync"
 
 	"github.com/gorilla/mux"
+	"github.com/mtharp/gunk/ftl"
 	"github.com/mtharp/gunk/rtsp"
 	"github.com/nareix/joy4/av/pubsub"
 	"github.com/nareix/joy4/format/rtmp"
@@ -42,6 +43,7 @@ type gunkServer struct {
 	liveBase    *url.URL
 	opusBitrate int
 	rtsp        *rtsp.Server
+	ftl         *ftl.Server
 
 	cookieSecure             bool
 	stateCookie, loginCookie string
@@ -116,11 +118,7 @@ func main() {
 		if err != nil {
 			log.Fatalln("error:", err)
 		}
-		v2 := os.Getenv("LISTEN_RTP")
-		if v2 == "" {
-			v2 = ":22002"
-		}
-		rtpSock, err := net.ListenPacket("udp", v2)
+		rtpSock, err := net.ListenPacket("udp", "")
 		if err != nil {
 			log.Fatalln("error:", err)
 		}
@@ -128,7 +126,31 @@ func main() {
 			Source:    s.getRTSPSource,
 			RTPSocket: rtpSock,
 		}
-		eg.Go(func() error { return s.rtsp.Listen(lis) })
+		eg.Go(func() error { return s.rtsp.Serve(lis) })
+	}
+
+	if v := os.Getenv("LISTEN_FTL"); v != "" {
+		lis, err := net.Listen("tcp", v)
+		if err != nil {
+			log.Fatalln("error:", err)
+		}
+		v2 := os.Getenv("LISTEN_FTL_RTP")
+		if v2 == "" {
+			v2 = v
+		}
+		rtpSock, err := net.ListenPacket("udp", v2)
+		s.ftl = &ftl.Server{
+			CheckUser: verifyFTL,
+			Publish:   s.handleIngest,
+			RTPSocket: rtpSock,
+		}
+		if v3 := os.Getenv("ADVERTISE_FTL_RTP"); v3 != "" {
+			s.ftl.RTPAdvertisePort, err = strconv.Atoi(v3)
+			if err != nil {
+				log.Fatalln("error: ADVERTISE_FTL_RTP:", err)
+			}
+		}
+		eg.Go(func() error { return s.ftl.Serve(lis) })
 	}
 
 	r := mux.NewRouter()
