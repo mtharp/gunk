@@ -12,8 +12,10 @@ import (
 	"net"
 	"time"
 
-	"github.com/mtharp/gunk/opus"
+	"eaglesong.dev/gunk/opus"
+	"eaglesong.dev/hls"
 	"github.com/nareix/joy4/av"
+	"github.com/nareix/joy4/av/avutil"
 	"github.com/nareix/joy4/av/pktque"
 	"github.com/nareix/joy4/av/pubsub"
 	"github.com/nareix/joy4/format/rtmp"
@@ -68,13 +70,20 @@ func (s *gunkServer) handleIngest(chname, userID, remote string, src av.Demuxer)
 	}
 
 	// go live
-	hls := new(HLSPublisher)
+	ch := &channel{q, opusq}
 	s.mu.Lock()
 	if existing := s.channels[chname]; existing != nil {
 		existing.queue.Close()
 	}
-	ch := &channel{q, opusq, hls}
 	s.channels[chname] = ch
+	p := s.hls[chname]
+	if p != nil {
+		// stream restarted so viewer should reset their decoder
+		p.Discontinuity()
+	} else {
+		p = new(hls.Publisher)
+		s.hls[chname] = p
+	}
 	s.mu.Unlock()
 	defer func() {
 		s.mu.Lock()
@@ -89,10 +98,9 @@ func (s *gunkServer) handleIngest(chname, userID, remote string, src av.Demuxer)
 
 	// start outputs
 	eg.Go(func() error {
-		return errors.Wrap(hls.Publish(q.Latest()), "hls publish")
+		return errors.Wrap(avutil.CopyFile(p, q.Latest()), "hls publish")
 	})
 	eg.Go(func() error {
-
 		defer q.Close()
 		for ctx.Err() == nil {
 			pkt, err := src.ReadPacket()

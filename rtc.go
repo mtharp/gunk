@@ -10,14 +10,14 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/mtharp/gunk/opus"
-	"github.com/mtharp/gunk/rtsp"
+	"eaglesong.dev/gunk/opus"
+	"eaglesong.dev/gunk/rtsp"
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/av/pubsub"
 	"github.com/pion/webrtc/v2"
 )
 
-const rtcIdleTime = 60 * time.Second
+const rtcIdleTime = 5 * time.Second
 
 var rtcConf = webrtc.Configuration{
 	ICEServers: []webrtc.ICEServer{{
@@ -30,6 +30,7 @@ var rtcConf = webrtc.Configuration{
 
 type rtcSender struct {
 	pc     *webrtc.PeerConnection
+	state  chan webrtc.ICEConnectionState
 	tracks []*rtsp.TrackFramer
 	addr   string
 }
@@ -61,9 +62,14 @@ func handleSDP(rw http.ResponseWriter, req *http.Request, queue *pubsub.Queue) e
 	}
 	sender := &rtcSender{
 		pc:     peerConnection,
+		state:  make(chan webrtc.ICEConnectionState, 1),
 		tracks: make([]*rtsp.TrackFramer, len(streams)),
 		addr:   req.RemoteAddr,
 	}
+	sender.pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
+		log.Printf("[rtc] %s connection state: %s", req.RemoteAddr, state)
+		sender.state <- state
+	})
 	answer, err := sender.setupTracks(streams, offer)
 	if err != nil {
 		peerConnection.Close()
@@ -127,30 +133,22 @@ func (s *rtcSender) setupTracks(streams []av.CodecData, offer webrtc.SessionDesc
 
 func (s *rtcSender) serve(src av.Demuxer) error {
 	defer s.pc.Close()
-	stateCh := make(chan bool, 1)
-	s.pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
-		log.Printf("[rtc] %s connection state: %s", s.addr, state)
-		stateCh <- state == webrtc.ICEConnectionStateConnected
-	})
-	t := time.NewTimer(rtcIdleTime)
-	var connected bool
-	var lastWarn time.Time
+	for st := range s.state {
+		if st == webrtc.ICEConnectionStateConnected {
+			break
+		} else if st > webrtc.ICEConnectionStateConnected {
+			return fmt.Errorf("webrtc connection failed: state is %s", st)
+		}
+	}
 	for {
 		// check if still connected
 		select {
-		case connected = <-stateCh:
+		case st := <-s.state:
+			if st != webrtc.ICEConnectionStateConnected {
+				return nil
+			}
 		default:
 		}
-		for !connected {
-			// wait for connection or timeout
-			t.Reset(rtcIdleTime)
-			select {
-			case <-t.C:
-				return nil
-			case connected = <-stateCh:
-			}
-		}
-		t.Stop()
 
 		packet, err := src.ReadPacket()
 		if err == io.EOF {
@@ -162,12 +160,7 @@ func (s *rtcSender) serve(src av.Demuxer) error {
 		if track == nil {
 			continue
 		}
-		if err := track.WritePacket(packet); err != nil {
-			if time.Since(lastWarn) < 10*time.Second {
-				log.Printf("[rtc] writing to %s: %s", s.addr, err)
-				lastWarn = time.Now()
-			}
-		}
+		_ = track.WritePacket(packet)
 	}
 	return nil
 }

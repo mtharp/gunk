@@ -1,8 +1,9 @@
-module github.com/mtharp/gunk
+module eaglesong.dev/gunk
 
 go 1.12
 
 require (
+	eaglesong.dev/hls v0.0.1
 	github.com/cockroachdb/apd v1.1.0 // indirect
 	github.com/golang/mock v1.3.1 // indirect
 	github.com/golang/protobuf v1.3.1 // indirect
@@ -35,4 +36,4 @@ require (
 	layeh.com/gopus v0.0.0-20161224163843-0ebf989153aa
 )
 
-replace github.com/nareix/joy4 => github.com/mtharp/joy4 v0.0.0-20190323221533-84311da2c824
+replace github.com/nareix/joy4 => eaglesong.dev/joy4 v0.0.0-20190323221533-84311da2c824

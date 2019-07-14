@@ -10,8 +10,8 @@ import (
 	"errors"
 	"log"
 
-	"github.com/mtharp/gunk/h264util"
-	"github.com/mtharp/gunk/rtsp"
+	"eaglesong.dev/gunk/h264util"
+	"eaglesong.dev/gunk/rtsp"
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/codec/h264parser"
 	"github.com/pion/rtp"

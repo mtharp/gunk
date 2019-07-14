@@ -1,3 +1,4 @@
 *.log
 *.ts
 .env.local
+.vscode

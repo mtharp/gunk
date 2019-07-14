@@ -17,9 +17,10 @@ import (
 	"strings"
 	"sync"
 
+	"eaglesong.dev/gunk/ftl"
+	"eaglesong.dev/gunk/rtsp"
+	"eaglesong.dev/hls"
 	"github.com/gorilla/mux"
-	"github.com/mtharp/gunk/ftl"
-	"github.com/mtharp/gunk/rtsp"
 	"github.com/nareix/joy4/av/pubsub"
 	"github.com/nareix/joy4/format/rtmp"
 	"golang.org/x/oauth2"
@@ -29,11 +30,11 @@ import (
 type channel struct {
 	queue *pubsub.Queue
 	opusq *pubsub.Queue
-	hls   *HLSPublisher
 }
 
 type gunkServer struct {
 	channels map[string]*channel
+	hls      map[string]*hls.Publisher
 	mu       sync.Mutex
 
 	router      *mux.Router
@@ -60,6 +61,7 @@ func main() {
 	}
 	s := &gunkServer{
 		channels:  make(map[string]*channel),
+		hls:       make(map[string]*hls.Publisher),
 		listeners: make(map[listener]struct{}),
 		rtmp:      &rtmp.Server{},
 		rtmpBase:  "rtmp://" + u.Hostname() + "/live",
@@ -221,7 +223,6 @@ func middleware(h http.Handler) http.Handler {
 		rw.Header().Set("Cache-Control", "private, no-cache, must-revalidate")
 		rw.Header().Set("Referrer-Policy", "no-referrer")
 		rw.Header().Set("X-Content-Type-Options", "nosniff")
-		rw.Header().Set("Access-Control-Allow-Origin", "*")
 		h.ServeHTTP(rw, req)
 	})
 }

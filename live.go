@@ -12,9 +12,9 @@ import (
 	"strconv"
 	"strings"
 
+	"eaglesong.dev/gunk/rtsp"
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx"
-	"github.com/mtharp/gunk/rtsp"
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/av/avutil"
 	"github.com/nareix/joy4/format/ts"
@@ -23,14 +23,14 @@ import (
 func (s *gunkServer) handleHLS(rw http.ResponseWriter, req *http.Request) {
 	chname := mux.Vars(req)["channel"]
 	s.mu.Lock()
-	ch := s.channels[chname]
+	p := s.hls[chname]
 	s.mu.Unlock()
-	if ch == nil {
+	if p == nil {
 		log.Printf("not found: %s", req.URL)
 		http.NotFound(rw, req)
 		return
 	}
-	ch.hls.ServeHTTP(rw, req)
+	p.ServeHTTP(rw, req)
 }
 
 func (s *gunkServer) handleRTC(rw http.ResponseWriter, req *http.Request) {
@@ -121,6 +121,7 @@ func (s *gunkServer) handleChannels(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "", 500)
 	}
 	blob, _ := json.Marshal(infos)
+	rw.Header().Set("Access-Control-Allow-Origin", "*")
 	rw.Header().Set("Content-Type", "application/json")
 	rw.Write(blob)
 }

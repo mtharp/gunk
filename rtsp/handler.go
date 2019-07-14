@@ -16,7 +16,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mtharp/gunk/opus"
+	"eaglesong.dev/gunk/opus"
 	"github.com/nareix/joy4/av"
 	"github.com/pion/rtp"
 	"github.com/pion/rtp/codecs"

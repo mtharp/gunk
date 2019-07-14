@@ -17,7 +17,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mtharp/gunk/opus"
+	"eaglesong.dev/gunk/opus"
 )
 
 func (c *Conn) handleHMAC() error {
