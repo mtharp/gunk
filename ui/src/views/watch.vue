@@ -1,7 +1,9 @@
 <template>
   <div class="player-box">
-    <hls-player :channel="channel" v-if="$root.playerType == 'HLS' || !$root.playerType" />
-    <rtc-player :channel="channel" v-if="$root.playerType == 'RTC'" />
+    <hls-player :channel="channel" v-if="ch.live && ($root.playerType == 'HLS' || !$root.playerType)" />
+    <rtc-player :channel="channel" v-if="ch.live && $root.playerType == 'RTC'" />
+    <img v-if="!ch.live" :src="ch.thumb" class="player-thumb">
+    <div v-if="!ch.live" class="player-shade">OFFLINE</div>
     <b-modal
       v-model="$root.showStreamInfo"
       title="Stream Info"
