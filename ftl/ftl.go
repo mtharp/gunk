@@ -31,8 +31,8 @@ type Server struct {
 	receivers map[string]chan<- []byte
 }
 
-type CheckUserFunc func(channelID string, nonce, hmacProvided []byte) (userID, channelName string, err error)
-type PublishFunc func(channelName, userID, remoteAddr string, src av.Demuxer) error
+type CheckUserFunc func(channelID string, nonce, hmacProvided []byte) (auth interface{}, err error)
+type PublishFunc func(auth interface{}, kind, remoteAddr string, src av.Demuxer) error
 
 func (s *Server) Serve(lis net.Listener) error {
 	go s.serveRTP()
@@ -80,10 +80,9 @@ type Conn struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	state       connState
-	nonce       []byte
-	userID      string
-	channelName string
+	state connState
+	nonce []byte
+	auth  interface{}
 
 	video, audio       bool
 	vcodec, acodec     string

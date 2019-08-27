@@ -51,11 +51,10 @@ func (c *Conn) handleConnect(words []string) error {
 	if err != nil {
 		return fmt.Errorf("parsing CONNECT: %s", err)
 	}
-	c.userID, c.channelName, err = c.s.CheckUser(channelID, c.nonce, digest)
+	c.auth, err = c.s.CheckUser(channelID, c.nonce, digest)
 	if err != nil {
 		return err
 	}
-	log.Printf("[ftl] authenticated %s as channel %s of user %s", c.conn.RemoteAddr(), c.channelName, c.userID)
 	c.state = stateConfig
 	return c.sendOK()
 }
@@ -175,14 +174,11 @@ func (c *Conn) handleLive() error {
 	hashKeys := c.hashKeys(ip)
 	c.s.addReceiver(hashKeys, rch)
 	remote := ip.String()
-	log.Printf("[ftl] user %s started publishing to %s from %s", c.userID, c.channelName, remote)
 	go func() {
 		defer c.s.delReceiver(hashKeys, rch)
-		if err := c.s.Publish(c.channelName, c.userID, remote, pktSrc); err != nil {
-			log.Printf("[ftl] error: publishing %s from %s: %s", c.channelName, remote, err)
+		if err := c.s.Publish(c.auth, "ftl", remote, pktSrc); err != nil {
+			log.Printf("[ftl] error: publishing from %s: %s", remote, err)
 			c.cancel()
-		} else {
-			log.Printf("[ftl] publish of %s stopped", c.channelName)
 		}
 	}()
 

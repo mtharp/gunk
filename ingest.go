@@ -30,19 +30,18 @@ func (s *gunkServer) handleRTMP(conn *rtmp.Conn) {
 		Demuxer: conn,
 		Filter:  &pktque.FixTime{MakeIncrement: true},
 	}
-	userID, chname, err := verifyRTMP(conn.URL)
+	auth, err := verifyRTMP(conn.URL)
 	if err != nil {
 		log.Printf("[rtmp] error: %s from %s: %s", conn.URL, remote, err)
 		return
 	}
-	log.Printf("[rtmp] user %s started publishing to %s from %s", userID, chname, remote)
-	if err := s.handleIngest(chname, userID, remote, fm); err != nil {
+	if err := s.handleIngest(auth, "rtmp", remote, fm); err != nil {
 		log.Printf("[rtmp] error: %s from %s: %s", conn.URL, remote, err)
 	}
-	log.Printf("[rtmp] publish of %s stopped", chname)
 }
 
-func (s *gunkServer) handleIngest(chname, userID, remote string, src av.Demuxer) error {
+func (s *gunkServer) handleIngest(authI interface{}, kind, remote string, src av.Demuxer) error {
+	auth := authI.(channelAuth)
 	streams, err := src.Streams()
 	if err != nil {
 		return errors.Wrap(err, "reading streams")
@@ -55,7 +54,7 @@ func (s *gunkServer) handleIngest(chname, userID, remote string, src av.Demuxer)
 		q.Close()
 	}()
 	// grab keyframes for thumbnail
-	grabch, err := grabFrames(chname, q.Latest())
+	grabch, err := grabFrames(auth.Name, q.Latest())
 	if err != nil {
 		return errors.Wrap(err, "setting up frame grabber")
 	}
@@ -72,29 +71,39 @@ func (s *gunkServer) handleIngest(chname, userID, remote string, src av.Demuxer)
 	// go live
 	ch := &channel{q, opusq}
 	s.mu.Lock()
-	if existing := s.channels[chname]; existing != nil {
+	if existing := s.channels[auth.Name]; existing != nil {
 		existing.queue.Close()
 	}
-	s.channels[chname] = ch
-	p := s.hls[chname]
+	s.channels[auth.Name] = ch
+	p := s.hls[auth.Name]
 	if p != nil {
 		// stream restarted so viewer should reset their decoder
 		p.Discontinuity()
 	} else {
 		p = new(hls.Publisher)
-		s.hls[chname] = p
+		s.hls[auth.Name] = p
 	}
 	s.mu.Unlock()
 	defer func() {
+		log.Printf("[%s] publish of %s stopped", kind, auth.Name)
 		s.mu.Lock()
-		if s.channels[chname] == ch {
-			delete(s.channels, chname)
+		if s.channels[auth.Name] == ch {
+			delete(s.channels, auth.Name)
 		}
 		s.mu.Unlock()
-		if err := s.wsChannelLive(chname, false, time.Time{}); err != nil {
-			log.Printf("[ingest] warning: %s: %s", chname, err)
+		if err := s.wsChannelLive(auth.Name, false, time.Time{}); err != nil {
+			log.Printf("[%s] warning: %s: %s", kind, auth.Name, err)
 		}
 	}()
+	// announce
+	log.Printf("[%s] user %s started publishing to %s from %s", kind, auth.UserID, auth.Name, remote)
+	if auth.Announce && s.webhookURL != "" {
+		go func() {
+			if err := s.doWebhook(auth); err != nil {
+				log.Printf("warning: failed to trigger webhook: %s", err)
+			}
+		}()
+	}
 
 	// start outputs
 	eg.Go(func() error {
@@ -118,7 +127,7 @@ func (s *gunkServer) handleIngest(chname, userID, remote string, src av.Demuxer)
 	eg.Go(func() error {
 		// notify ws clients when thumbnail is updated
 		for thumbTime := range grabch {
-			if err := s.wsChannelLive(chname, true, thumbTime); err != nil {
+			if err := s.wsChannelLive(auth.Name, true, thumbTime); err != nil {
 				log.Println("warning:", err)
 			}
 		}

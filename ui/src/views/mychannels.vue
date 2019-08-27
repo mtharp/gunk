@@ -11,9 +11,12 @@
       </b-form>
       <b-list-group class="mt-5">
         <b-list-group-item v-for="def in defs" :key="def.name">
+          <h4>{{def.name}}</h4>
+          <b-form-group>
+            <b-form-checkbox v-model="def.announce" switch @change="doUpdate(def)">Announce {{def.announce ? "Enabled" : "Disabled"}}</b-form-checkbox>
+          </b-form-group>
           <b-button class="mr-2" size="sm" variant="danger" @click="doDelete(def)">Delete</b-button>
           <b-button class="mr-2" size="sm" @click="doShow(def)">Show Key</b-button>
-          {{def.name}}
         </b-list-group-item>
       </b-list-group>
     </div>
@@ -73,6 +76,9 @@ export default {
             this.alert = "HTTP error while creating channel"
           }
         })
+    },
+    doUpdate(def) {
+      axios.put("/api/mychannels/" + encodeURIComponent(def.name), def)
     },
     doDelete(def) {
       axios.delete("/api/mychannels/" + encodeURIComponent(def.name))

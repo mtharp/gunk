@@ -39,8 +39,9 @@ func connectDB() error {
 }
 
 type channelDef struct {
-	Name string `json:"name"`
-	Key  string `json:"key"`
+	Name     string `json:"name"`
+	Key      string `json:"key"`
+	Announce bool   `json:"announce"`
 
 	RTMPDir  string `json:"rtmp_dir"`
 	RTMPBase string `json:"rtmp_base"`
@@ -53,7 +54,7 @@ func (d *channelDef) setURL(base string) {
 }
 
 func getChannelDefs(userID string) (defs []*channelDef, err error) {
-	rows, err := db.Query("SELECT name, key FROM channel_defs WHERE user_id = $1", userID)
+	rows, err := db.Query("SELECT name, key, announce FROM channel_defs WHERE user_id = $1", userID)
 	if err != nil {
 		return
 	}
@@ -61,7 +62,7 @@ func getChannelDefs(userID string) (defs []*channelDef, err error) {
 	defs = []*channelDef{}
 	for rows.Next() {
 		def := new(channelDef)
-		if err = rows.Scan(&def.Name, &def.Key); err != nil {
+		if err = rows.Scan(&def.Name, &def.Key, &def.Announce); err != nil {
 			return
 		}
 		defs = append(defs, def)
@@ -76,11 +77,21 @@ func createChannel(userID, name string) (def *channelDef, err error) {
 		return
 	}
 	key := hex.EncodeToString(b)
-	_, err = db.Exec("INSERT INTO channel_defs (user_id, name, key) VALUES ($1, $2, $3)", userID, name, key)
+	_, err = db.Exec("INSERT INTO channel_defs (user_id, name, key, announce) VALUES ($1, $2, $3, true)", userID, name, key)
 	if err != nil {
 		return
 	}
-	return &channelDef{Name: name, Key: key}, nil
+	return &channelDef{Name: name, Key: key, Announce: true}, nil
+}
+
+func updateChannel(userID, name string, announce bool) error {
+	tag, err := db.Exec("UPDATE channel_defs SET announce = $1 WHERE user_id = $2 AND name = $3", announce, userID, name)
+	if err != nil {
+		return err
+	} else if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
 }
 
 func deleteChannel(userID, name string) error {
@@ -90,37 +101,51 @@ func deleteChannel(userID, name string) error {
 
 var ErrUserNotFound = errors.New("user not found or wrong key")
 
-func verifyRTMP(u *url.URL) (userID, channelName string, err error) {
-	channelName = path.Base(u.Path)
-	key := u.Query().Get("key")
-	row := db.QueryRow("SELECT user_id FROM channel_defs WHERE name = $1 AND key = $2", channelName, key)
-	if err = row.Scan(&userID); err != nil {
+type channelAuth struct {
+	UserID   string
+	Name     string
+	Announce bool
+}
+
+func findChannel(column, value string) (auth channelAuth, key string, err error) {
+	row := db.QueryRow("SELECT user_id, channel_defs.name, channel_defs.key, COALESCE(channel_defs.announce AND users.announce, false) FROM channel_defs LEFT JOIN users USING (user_id) WHERE "+column+" = $1", value)
+	err = row.Scan(&auth.UserID, &auth.Name, &key, &auth.Announce)
+	return
+}
+
+func verifyRTMP(u *url.URL) (auth channelAuth, err error) {
+	var expectKey string
+	auth, expectKey, err = findChannel("name", path.Base(u.Path))
+	if err != nil {
 		if err == pgx.ErrNoRows {
 			err = ErrUserNotFound
 		}
+		return
+	}
+	key := u.Query().Get("key")
+	if !hmac.Equal([]byte(key), []byte(expectKey)) {
+		err = ErrUserNotFound
 		return
 	}
 	return
 }
 
-func verifyFTL(channelID string, nonce, hmacProvided []byte) (userID, channelName string, err error) {
-	row := db.QueryRow("SELECT user_id, name, key FROM channel_defs WHERE ftl_id = $1", channelID)
-	var key string
-	if err = row.Scan(&userID, &channelName, &key); err != nil {
+func verifyFTL(channelID string, nonce, hmacProvided []byte) (interface{}, error) {
+	auth, key, err := findChannel("ftl_id", channelID)
+	if err != nil {
 		if err == pgx.ErrNoRows {
 			err = ErrUserNotFound
 		}
-		return
+		return nil, err
 	}
 	hm := hmac.New(sha512.New, []byte(key))
 	hm.Write(nonce)
 	expected := hm.Sum(nil)
 	if !hmac.Equal(expected, hmacProvided) {
-		log.Printf("error: hmac digest mismatch for FTL channel %s", channelName)
-		err = ErrUserNotFound
-		return
+		log.Printf("error: hmac digest mismatch for FTL channel %s", auth.Name)
+		return nil, ErrUserNotFound
 	}
-	return
+	return auth, nil
 }
 
 func getThumb(channelName string) (d []byte, err error) {
@@ -205,6 +230,30 @@ func (s *gunkServer) viewDefsCreate(rw http.ResponseWriter, req *http.Request) {
 	blob, _ := json.Marshal(def)
 	rw.Header().Set("Content-Type", "application/json")
 	rw.Write(blob)
+}
+
+type defUpdate struct {
+	Announce bool `json:"announce"`
+}
+
+func (s *gunkServer) viewDefsUpdate(rw http.ResponseWriter, req *http.Request) {
+	userID := s.checkAuth(rw, req)
+	if userID == "" {
+		return
+	}
+	var du defUpdate
+	if !parseRequest(rw, req, &du) {
+		return
+	}
+	name := mux.Vars(req)["name"]
+	if err := updateChannel(userID, name, du.Announce); err != nil {
+		log.Printf("error: updating channel %q for %s: %s", name, req.RemoteAddr, err)
+		http.Error(rw, "", 500)
+		return
+	}
+	rw.Header().Set("Content-Type", "application/json")
+	rw.Write([]byte("{}"))
+	return
 }
 
 func (s *gunkServer) viewDefsDelete(rw http.ResponseWriter, req *http.Request) {

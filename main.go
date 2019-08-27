@@ -6,6 +6,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"eaglesong.dev/gunk/ftl"
 	"eaglesong.dev/gunk/rtsp"
@@ -37,14 +39,17 @@ type gunkServer struct {
 	hls      map[string]*hls.Publisher
 	mu       sync.Mutex
 
-	router      *mux.Router
-	oauth       *oauth2.Config
-	rtmp        *rtmp.Server
-	rtmpBase    string
-	liveBase    *url.URL
-	opusBitrate int
-	rtsp        *rtsp.Server
-	ftl         *ftl.Server
+	router       *mux.Router
+	baseURL      string
+	oauth        *oauth2.Config
+	rtmp         *rtmp.Server
+	rtmpBase     string
+	liveBase     *url.URL
+	opusBitrate  int
+	rtsp         *rtsp.Server
+	ftl          *ftl.Server
+	webhookURL   string
+	webhookGuild string
 
 	cookieSecure             bool
 	stateCookie, loginCookie string
@@ -63,6 +68,7 @@ func main() {
 		channels:  make(map[string]*channel),
 		hls:       make(map[string]*hls.Publisher),
 		listeners: make(map[listener]struct{}),
+		baseURL:   base,
 		rtmp:      &rtmp.Server{},
 		rtmpBase:  "rtmp://" + u.Hostname() + "/live",
 	}
@@ -75,7 +81,7 @@ func main() {
 			TokenURL:  "https://discordapp.com/api/oauth2/token",
 			AuthStyle: oauth2.AuthStyleInHeader,
 		},
-		Scopes: []string{"identify"},
+		Scopes: []string{"identify", "guilds"},
 	}
 	if u.Scheme == "https" {
 		s.cookieSecure = true
@@ -155,6 +161,17 @@ func main() {
 		eg.Go(func() error { return s.ftl.Serve(lis) })
 	}
 
+	if v := os.Getenv("WEBHOOK"); v != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		hook, err := checkWebhook(ctx, v)
+		cancel()
+		if err != nil {
+			log.Fatalln("error: validating webhook:", err)
+		}
+		s.webhookURL = v
+		s.webhookGuild = hook.GuildID
+	}
+
 	r := mux.NewRouter()
 	s.router = r
 	r.HandleFunc("/ws", s.handleWS)
@@ -177,6 +194,7 @@ func main() {
 	// model
 	r.HandleFunc("/api/mychannels", s.viewDefs).Methods("GET")
 	r.HandleFunc("/api/mychannels", s.viewDefsCreate).Methods("POST")
+	r.HandleFunc("/api/mychannels/{name}", s.viewDefsUpdate).Methods("PUT")
 	r.HandleFunc("/api/mychannels/{name}", s.viewDefsDelete).Methods("DELETE")
 
 	eg.Go(func() error { return http.ListenAndServe(":8009", middleware(r)) })

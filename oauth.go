@@ -100,21 +100,41 @@ func (s *gunkServer) tokenExchange(rw http.ResponseWriter, req *http.Request) (*
 	return s.oauth.Exchange(req.Context(), code)
 }
 
-func (s *gunkServer) getIdentity(ctx context.Context, token *oauth2.Token) (ident identity, err error) {
-	cli := oauth2.NewClient(ctx, oauth2.StaticTokenSource(token))
-	resp, err := cli.Get("https://discordapp.com/api/users/@me")
+func httpGet(ctx context.Context, cli *http.Client, uri string, body interface{}) error {
+	req, err := http.NewRequest("GET", uri, nil)
 	if err != nil {
-		return
+		return err
+	}
+	resp, err := cli.Do(req.WithContext(ctx))
+	if err != nil {
+		return err
 	}
 	blob, err := ioutil.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
-		return
+		return err
 	} else if resp.StatusCode != 200 {
-		err = fmt.Errorf("HTTP %s on %s %s:\n%s", resp.Status, resp.Request.Method, resp.Request.URL, string(blob))
+		return fmt.Errorf("HTTP %s on %s %s:\n%s", resp.Status, resp.Request.Method, resp.Request.URL, string(blob))
+	}
+	return json.Unmarshal(blob, body)
+}
+
+func (s *gunkServer) getIdentity(ctx context.Context, token *oauth2.Token) (ident identity, err error) {
+	cli := oauth2.NewClient(ctx, oauth2.StaticTokenSource(token))
+	if err = httpGet(ctx, cli, "https://discordapp.com/api/users/@me", &ident); err != nil {
 		return
 	}
-	err = json.Unmarshal(blob, &ident)
+	var guildList []guildItem
+	if err = httpGet(ctx, cli, "https://discordapp.com/api/users/@me/guilds", &guildList); err != nil {
+		return
+	}
+	var announce bool
+	for _, guild := range guildList {
+		if guild.ID == s.webhookGuild {
+			announce = true
+		}
+	}
+	_, err = db.Exec("INSERT INTO users (user_id, refresh_token, announce) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO UPDATE SET refresh_token = EXCLUDED.refresh_token, announce = EXCLUDED.announce", ident.ID, token.RefreshToken, announce)
 	return
 }
 
@@ -129,4 +149,9 @@ type identity struct {
 	Username      string `json:"username"`
 	Discriminator string `json:"discriminator"`
 	Avatar        string `json:"avatar"`
+}
+
+type guildItem struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
