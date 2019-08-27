@@ -16,11 +16,18 @@
 </template>
 
 <script>
+import HLSPlayer from '../components/hlsplayer.vue'
+import RTCPlayer from '../components/rtcplayer.vue'
+
 export default {
   name: 'watch',
   props: [
     'channel',
   ],
+  components: {
+    'hls-player': HLSPlayer,
+    'rtc-player': RTCPlayer
+  },
   computed: {
     ch() {
       for (let ch of Object.values(this.$root.channels)) {

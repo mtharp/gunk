@@ -1,4 +1,4 @@
-FROM golang AS gobuild
+FROM golang:1.13rc1 AS gobuild
 WORKDIR /work
 COPY go.mod go.sum ./
 RUN go mod download
@@ -7,10 +7,10 @@ RUN go build -o /gunk -ldflags "-w -s" -v .
 
 FROM node AS uibuild
 WORKDIR /work
-COPY ui/package.json ui/package-lock.json ./
-RUN npm install
+COPY ui/package.json ui/yarn.lock ./
+RUN yarn install
 COPY ui/ ./
-RUN npm run build
+RUN yarn build
 
 FROM debian:testing-slim
 RUN apt update && apt install -y ca-certificates ffmpeg && rm -rf /var/lib/apt/lists/*

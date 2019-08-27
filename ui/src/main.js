@@ -13,11 +13,6 @@ import './assets/site.css'
 import VueTimeago from 'vue-timeago'
 Vue.use(VueTimeago, {locale: 'en'})
 
-import HLSPlayer from './components/hlsplayer.vue'
-Vue.component('hls-player', HLSPlayer)
-import RTCPlayer from './components/rtcplayer.vue'
-Vue.component('rtc-player', RTCPlayer)
-
 Vue.config.productionTip = false
 Vue.config.ignoredElements = ["video-js"]
 
