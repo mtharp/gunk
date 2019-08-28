@@ -1,37 +1,18 @@
-// Copyright © Michael Tharp <gxti@partiallystapled.com>
-//
-// This file is distributed under the terms of the MIT License.
-// See the LICENSE file at the top of this tree or http://opensource.org/licenses/MIT
-
 package rtsp
 
 import (
 	"bytes"
-	"math/bits"
 	"net"
 	"time"
 
 	"eaglesong.dev/gunk/h264util"
+	"eaglesong.dev/gunk/internal"
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/codec/h264parser"
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v2"
 	"github.com/pion/webrtc/v2/pkg/media"
 )
-
-// ToTS converts a duration to a number of clock ticks at a rate of clockRate
-func ToTS(t time.Duration, clockRate uint64) uint64 {
-	hi, lo := bits.Mul64(uint64(t), clockRate)
-	ts, _ := bits.Div64(hi, lo, uint64(time.Second))
-	return ts
-}
-
-// FromTS converts a tick timestamp to a duration
-func FromTS(ts, clockRate uint64) time.Duration {
-	hi, lo := bits.Mul64(uint64(ts), uint64(time.Second))
-	t, _ := bits.Div64(hi, lo, clockRate)
-	return time.Duration(t)
-}
 
 type framer struct {
 	ts  uint64
@@ -40,7 +21,7 @@ type framer struct {
 }
 
 func (f *framer) delta(t time.Duration, rate uint64) uint32 {
-	ts := ToTS(t, rate)
+	ts := internal.ToTS(t, rate)
 	var samples uint32
 	if f.got {
 		samples = uint32(ts - f.ts)

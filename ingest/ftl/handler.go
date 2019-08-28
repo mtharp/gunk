@@ -1,8 +1,3 @@
-// Copyright © Michael Tharp <gxti@partiallystapled.com>
-//
-// This file is distributed under the terms of the MIT License.
-// See the LICENSE file at the top of this tree or http://opensource.org/licenses/MIT
-
 package ftl
 
 import (
@@ -17,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	"eaglesong.dev/gunk/opus"
+	"eaglesong.dev/gunk/transcode/opus"
 )
 
 func (c *Conn) handleHMAC() error {

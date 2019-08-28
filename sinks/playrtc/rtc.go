@@ -1,4 +1,4 @@
-package main
+package playrtc
 
 import (
 	"encoding/json"
@@ -10,10 +10,9 @@ import (
 	"net/http"
 	"time"
 
-	"eaglesong.dev/gunk/opus"
-	"eaglesong.dev/gunk/rtsp"
+	"eaglesong.dev/gunk/sinks/rtsp"
+	"eaglesong.dev/gunk/transcode/opus"
 	"github.com/nareix/joy4/av"
-	"github.com/nareix/joy4/av/pubsub"
 	"github.com/pion/webrtc/v2"
 )
 
@@ -35,7 +34,7 @@ type rtcSender struct {
 	addr   string
 }
 
-func handleSDP(rw http.ResponseWriter, req *http.Request, queue *pubsub.Queue) error {
+func HandleSDP(rw http.ResponseWriter, req *http.Request, src av.Demuxer) error {
 	// parse offer
 	blob, err := ioutil.ReadAll(req.Body)
 	if err != nil {
@@ -47,8 +46,7 @@ func handleSDP(rw http.ResponseWriter, req *http.Request, queue *pubsub.Queue) e
 		return nil
 	}
 	// build tracks
-	dm := queue.Latest()
-	streams, err := dm.Streams()
+	streams, err := src.Streams()
 	if err != nil {
 		return err
 	}
@@ -83,7 +81,7 @@ func handleSDP(rw http.ResponseWriter, req *http.Request, queue *pubsub.Queue) e
 	rw.Write(blob)
 	// serve in background
 	go func() {
-		if err := sender.serve(dm); err != nil {
+		if err := sender.serve(src); err != nil {
 			log.Printf("error: serving rtc to %s: %s", req.RemoteAddr, err)
 		}
 	}()

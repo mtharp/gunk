@@ -1,8 +1,3 @@
-// Copyright © Michael Tharp <gxti@partiallystapled.com>
-//
-// This file is distributed under the terms of the MIT License.
-// See the LICENSE file at the top of this tree or http://opensource.org/licenses/MIT
-
 package ftl
 
 import (
@@ -11,7 +6,7 @@ import (
 	"log"
 
 	"eaglesong.dev/gunk/h264util"
-	"eaglesong.dev/gunk/rtsp"
+	"eaglesong.dev/gunk/internal"
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/codec/h264parser"
 	"github.com/pion/rtp"
@@ -45,7 +40,7 @@ func (f *Deframer) Deframe(rp *rtp.Packet) ([]av.Packet, error) {
 	}
 	ts := f.baseTS + uint64(rp.Timestamp)
 	f.lastTS = rp.Timestamp
-	t := rtsp.FromTS(ts, f.ClockRate)
+	t := internal.FromTS(ts, f.ClockRate)
 	packets, err := f.Parser.ParseFrame(rp.Payload)
 	for i := range packets {
 		packets[i].Time = t

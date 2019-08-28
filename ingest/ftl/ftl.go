@@ -1,8 +1,3 @@
-// Copyright © Michael Tharp <gxti@partiallystapled.com>
-//
-// This file is distributed under the terms of the MIT License.
-// See the LICENSE file at the top of this tree or http://opensource.org/licenses/MIT
-
 package ftl
 
 import (
@@ -17,12 +12,14 @@ import (
 	"sync"
 	"time"
 
+	"eaglesong.dev/gunk/model"
 	"github.com/nareix/joy4/av"
 )
 
 type Server struct {
 	CheckUser CheckUserFunc
 	Publish   PublishFunc
+	Listener  net.Listener
 	RTPSocket net.PacketConn
 
 	RTPAdvertisePort int
@@ -31,13 +28,28 @@ type Server struct {
 	receivers map[string]chan<- []byte
 }
 
-type CheckUserFunc func(channelID string, nonce, hmacProvided []byte) (auth interface{}, err error)
-type PublishFunc func(auth interface{}, kind, remoteAddr string, src av.Demuxer) error
+type CheckUserFunc func(channelID string, nonce, hmacProvided []byte) (auth model.ChannelAuth, err error)
+type PublishFunc func(auth model.ChannelAuth, kind, remoteAddr string, src av.Demuxer) error
 
-func (s *Server) Serve(lis net.Listener) error {
+func (s *Server) Listen(addr string) (err error) {
+	if addr == "" {
+		addr = ":8084"
+	}
+	s.Listener, err = net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+	s.RTPSocket, err = net.ListenPacket("udp", addr)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Server) Serve() error {
 	go s.serveRTP()
 	for {
-		conn, err := lis.Accept()
+		conn, err := s.Listener.Accept()
 		if err != nil {
 			log.Println("error: accepting FTL connection:", err)
 			time.Sleep(time.Second)
@@ -82,7 +94,7 @@ type Conn struct {
 
 	state connState
 	nonce []byte
-	auth  interface{}
+	auth  model.ChannelAuth
 
 	video, audio       bool
 	vcodec, acodec     string

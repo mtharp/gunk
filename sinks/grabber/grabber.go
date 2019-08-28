@@ -1,9 +1,4 @@
-// Copyright © Michael Tharp <gxti@partiallystapled.com>
-//
-// This file is distributed under the terms of the MIT License.
-// See the LICENSE file at the top of this tree or http://opensource.org/licenses/MIT
-
-package main
+package grabber
 
 import (
 	"bytes"
@@ -16,6 +11,7 @@ import (
 	"time"
 
 	"eaglesong.dev/gunk/h264util"
+	"eaglesong.dev/gunk/model"
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/codec/h264parser"
 )
@@ -25,7 +21,7 @@ const (
 	grabInterval = 10 * time.Second
 )
 
-func grabFrames(channelName string, dm av.Demuxer) (<-chan time.Time, error) {
+func Grab(channelName string, dm av.Demuxer) (<-chan time.Time, error) {
 	streams, err := dm.Streams()
 	if err != nil {
 		return nil, err
@@ -100,5 +96,5 @@ func makeFrame(channelName string, cd h264parser.CodecData, raw []byte) error {
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("%s\n%s", err.Error(), errmsg.String())
 	}
-	return putThumb(channelName, jpeg.Bytes())
+	return model.PutThumb(channelName, jpeg.Bytes())
 }

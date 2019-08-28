@@ -1,9 +1,4 @@
-// Copyright © Michael Tharp <gxti@partiallystapled.com>
-//
-// This file is distributed under the terms of the MIT License.
-// See the LICENSE file at the top of this tree or http://opensource.org/licenses/MIT
-
-package main
+package web
 
 import (
 	"crypto/rand"
@@ -17,13 +12,18 @@ import (
 	"golang.org/x/crypto/nacl/secretbox"
 )
 
-func (s *gunkServer) setSecret(secret string) {
+const (
+	stateCookie = "ostate"
+	loginCookie = "login"
+)
+
+func (s *Server) SetSecret(secret string) {
 	d := sha256.New()
 	d.Write([]byte(secret))
 	copy(s.key[:], d.Sum(nil))
 }
 
-func (s *gunkServer) setCookie(rw http.ResponseWriter, name string, value interface{}, maxAge int) error {
+func (s *Server) setCookie(rw http.ResponseWriter, name string, value interface{}, maxAge int) error {
 	var cvalue string
 	if value != nil {
 		blob, err := json.Marshal(value)
@@ -40,18 +40,25 @@ func (s *gunkServer) setCookie(rw http.ResponseWriter, name string, value interf
 		cvalue = base64.RawURLEncoding.EncodeToString(sealed)
 	}
 
-	http.SetCookie(rw, &http.Cookie{
+	cookie := &http.Cookie{
 		Name:     name,
 		Value:    cvalue,
 		MaxAge:   maxAge,
 		Path:     "/",
-		Secure:   s.cookieSecure,
+		Secure:   s.Secure,
 		HttpOnly: true,
-	})
+	}
+	if s.Secure {
+		cookie.Name = "__Host-" + cookie.Name
+	}
+	http.SetCookie(rw, cookie)
 	return nil
 }
 
-func (s *gunkServer) unseal(req *http.Request, name string, value interface{}) error {
+func (s *Server) unseal(req *http.Request, name string, value interface{}) error {
+	if s.Secure {
+		name = "__Host-" + name
+	}
 	cookie, err := req.Cookie(name)
 	if err != nil {
 		return err

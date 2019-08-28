@@ -1,8 +1,3 @@
-// Copyright © Michael Tharp <gxti@partiallystapled.com>
-//
-// This file is distributed under the terms of the MIT License.
-// See the LICENSE file at the top of this tree or http://opensource.org/licenses/MIT
-
 package rtsp
 
 import (
@@ -26,14 +21,30 @@ var ErrNotFound = errors.New("stream not found")
 
 type Server struct {
 	Source    SourceFunc
+	Listener  net.Listener
 	RTPSocket net.PacketConn
 }
 
 type SourceFunc func(*Request) (av.Demuxer, error)
 
-func (s *Server) Serve(lis net.Listener) error {
+func (s *Server) Listen(addr string) (err error) {
+	if addr == "" {
+		addr = ":8554"
+	}
+	s.Listener, err = net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+	s.RTPSocket, err = net.ListenPacket("udp", addr)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Server) Serve() error {
 	for {
-		conn, err := lis.Accept()
+		conn, err := s.Listener.Accept()
 		if err != nil {
 			log.Println("error: accepting RTSP connection:", err)
 			time.Sleep(time.Second)
