@@ -20,7 +20,7 @@ func (m *Manager) queue(name string, opus bool) av.Demuxer {
 	if opus {
 		return m.opus[name].Latest()
 	}
-	return m.ingest[name].Latest()
+	return m.aac[name].Latest()
 }
 
 func (m *Manager) ServeTS(rw http.ResponseWriter, req *http.Request, name string) error {
@@ -71,7 +71,7 @@ func (m *Manager) GetRTSPSource(req *rtsp.Request) (av.Demuxer, error) {
 func (m *Manager) PopulateLive(infos []*model.ChannelInfo) {
 	m.mu.Lock()
 	for _, info := range infos {
-		if m.ingest[info.Name] != nil {
+		if m.aac[info.Name] != nil {
 			info.Live = true
 		}
 	}

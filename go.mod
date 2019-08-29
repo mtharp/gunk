@@ -13,7 +13,7 @@ require (
 	github.com/jackc/pgx v3.5.0+incompatible
 	github.com/kr/pretty v0.1.0
 	github.com/lib/pq v1.1.1 // indirect
-	github.com/lucas-clemente/quic-go v0.12.0 // indirect
+	github.com/lucas-clemente/quic-go v0.7.1-0.20190825070216-f1d14ecdeafb // indirect
 	github.com/nareix/joy4 v0.0.0-20181022032202-3ddbc8f9d431
 	github.com/onsi/ginkgo v1.9.0 // indirect
 	github.com/onsi/gomega v1.7.0 // indirect

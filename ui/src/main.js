@@ -16,6 +16,11 @@ Vue.use(VueTimeago, {locale: 'en'})
 Vue.config.productionTip = false
 Vue.config.ignoredElements = ["video-js"]
 
+let initialPlayerType = localStorage.getItem("playerType");
+if (initialPlayerType != "RTC") {
+  initialPlayerType = "HLS";
+}
+
 new Vue({
   router,
   render: h => h(App),
@@ -28,7 +33,7 @@ new Vue({
       avatar: null,
     },
     showStreamInfo: false,
-    playerType: "HLS",
+    playerType: initialPlayerType,
   },
   methods: {
     updateChannels() {
@@ -51,7 +56,7 @@ new Vue({
     },
     navChannel(name) {
       return {name: 'watch', params: {channel: name}}
-    },
+    }
   },
   computed: {
     loggedIn() { return this.user.id !== null && this.user.id !== "" },
@@ -70,9 +75,11 @@ new Vue({
     this.updateUser();
     this.chinterval = window.setInterval(this.updateChannels, 5000)
     this.userinterval = window.setInterval(this.updateUser, 300000)
+    this.unwatch = this.$watch("playerType", v => localStorage.setItem("playerType", v))
   },
   beforeDestroy() {
     window.clearInterval(this.chinterval)
     window.clearInterval(this.userinterval)
+    this.unwatch()
   }
 }).$mount('#app')

@@ -37,7 +37,7 @@ export default {
           return ch
         }
       }
-      return null
+      return {}
     },
     baseURL() {
       let base = window.location.protocol + "//" + window.location.hostname
@@ -48,11 +48,7 @@ export default {
     },
     hlsURL() { return this.baseURL + "/hls/" + encodeURIComponent(this.channel) + "/index.m3u8" },
     liveURL() {
-      let ch = this.ch
-      if (ch === null) {
-        return null
-      }
-      let u = ch.live_url
+      let u = this.ch.live_url
       if (u[0] == '/') {
         return this.baseURL + u
       }

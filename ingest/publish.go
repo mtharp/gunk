@@ -24,10 +24,10 @@ type Manager struct {
 	PublishEvent PublishEvent
 	FTL          ftl.Server
 
-	mu     sync.Mutex
-	ingest map[string]*pubsub.Queue
-	opus   map[string]*pubsub.Queue
-	hls    map[string]*hls.Publisher
+	mu   sync.Mutex
+	aac  map[string]*pubsub.Queue
+	opus map[string]*pubsub.Queue
+	hls  map[string]*hls.Publisher
 }
 
 func (m *Manager) Initialize() {
@@ -63,15 +63,15 @@ func (m *Manager) Publish(auth model.ChannelAuth, kind, remote string, src av.De
 
 	// go live
 	m.mu.Lock()
-	if m.ingest == nil {
-		m.ingest = make(map[string]*pubsub.Queue)
+	if m.aac == nil {
+		m.aac = make(map[string]*pubsub.Queue)
 		m.opus = make(map[string]*pubsub.Queue)
 		m.hls = make(map[string]*hls.Publisher)
 	}
-	if existing := m.ingest[name]; existing != nil {
+	if existing := m.aac[name]; existing != nil {
 		existing.Close()
 	}
-	m.ingest[name] = q
+	m.aac[name] = q
 	m.opus[name] = opusq
 	p := m.hls[name]
 	if p != nil {
@@ -86,8 +86,8 @@ func (m *Manager) Publish(auth model.ChannelAuth, kind, remote string, src av.De
 	defer func() {
 		log.Printf("[%s] publish of %s stopped", kind, auth.Name)
 		m.mu.Lock()
-		if m.ingest[name] == q {
-			delete(m.ingest, name)
+		if m.aac[name] == q {
+			delete(m.aac, name)
 			delete(m.opus, name)
 		}
 		m.mu.Unlock()
