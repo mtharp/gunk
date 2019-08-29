@@ -8,11 +8,15 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"eaglesong.dev/gunk/sinks/rtsp"
 	"eaglesong.dev/gunk/transcode/opus"
 	"github.com/nareix/joy4/av"
+	"github.com/pion/rtp/codecs"
+	"github.com/pion/sdp"
 	"github.com/pion/webrtc/v2"
 )
 
@@ -51,8 +55,14 @@ func HandleSDP(rw http.ResponseWriter, req *http.Request, src av.Demuxer) error 
 		return err
 	}
 	var m webrtc.MediaEngine
+	h264Codec, err := chooseCodec(offer.SDP)
+	if err != nil {
+		log.Printf("unable to determine h264 codec attributes: %s", err)
+		http.Error(rw, "invalid offer", 400)
+		return nil
+	}
+	m.RegisterCodec(h264Codec)
 	m.RegisterCodec(rtsp.OpusCodec)
-	m.RegisterCodec(rtsp.H264Codec)
 	api := webrtc.NewAPI(webrtc.WithMediaEngine(m))
 	peerConnection, err := api.NewPeerConnection(rtcConf)
 	if err != nil {
@@ -68,7 +78,7 @@ func HandleSDP(rw http.ResponseWriter, req *http.Request, src av.Demuxer) error 
 		log.Printf("[rtc] %s connection state: %s", req.RemoteAddr, state)
 		sender.state <- state
 	})
-	answer, err := sender.setupTracks(streams, offer)
+	answer, err := sender.setupTracks(streams, offer, h264Codec)
 	if err != nil {
 		peerConnection.Close()
 		return err
@@ -88,13 +98,13 @@ func HandleSDP(rw http.ResponseWriter, req *http.Request, src av.Demuxer) error 
 	return nil
 }
 
-func (s *rtcSender) setupTracks(streams []av.CodecData, offer webrtc.SessionDescription) (*webrtc.SessionDescription, error) {
+func (s *rtcSender) setupTracks(streams []av.CodecData, offer webrtc.SessionDescription, h264Codec *webrtc.RTPCodec) (*webrtc.SessionDescription, error) {
 	ssrc := rand.Uint32()
 	for i, stream := range streams {
 		var codec *webrtc.RTPCodec
 		switch stream.Type() {
 		case av.H264:
-			codec = rtsp.H264Codec
+			codec = h264Codec
 		case opus.OPUS:
 			codec = rtsp.OpusCodec
 		default:
@@ -161,4 +171,60 @@ func (s *rtcSender) serve(src av.Demuxer) error {
 		_ = track.WritePacket(packet)
 	}
 	return nil
+}
+
+// firefox is very picky about payload type numbers, even when everything else matches. so to appease it, parse its offer to figure out what payload type numbers it wants to use.
+func chooseCodec(offer string) (*webrtc.RTPCodec, error) {
+	var parsed sdp.SessionDescription
+	if err := parsed.Unmarshal(offer); err != nil {
+		return nil, err
+	}
+	var candidate *webrtc.RTPCodec
+	for _, media := range parsed.MediaDescriptions {
+		h264Types := make(map[string]struct{})
+		for _, attr := range media.Attributes {
+			if attr.Key != "rtpmap" {
+				continue
+			}
+			i := strings.IndexRune(attr.Value, ' ')
+			j := strings.IndexRune(attr.Value, '/')
+			if j < 0 || j < i {
+				continue
+			}
+			payloadType := attr.Value[:i]
+			codecName := attr.Value[i+1 : j]
+			if codecName == "H264" {
+				h264Types[payloadType] = struct{}{}
+			}
+		}
+		if len(h264Types) == 0 {
+			continue
+		}
+		for _, attr := range media.Attributes {
+			if attr.Key != "fmtp" {
+				continue
+			}
+			i := strings.IndexRune(attr.Value, ' ')
+			if i < 0 {
+				continue
+			}
+			payloadType := attr.Value[:i]
+			if _, ok := h264Types[payloadType]; !ok {
+				continue
+			}
+			fmtp := attr.Value[i+1:]
+			pti64, err := strconv.ParseUint(payloadType, 10, 8)
+			if err != nil {
+				continue
+			}
+			pti := uint8(pti64)
+			if candidate == nil || candidate.PayloadType > pti {
+				candidate = webrtc.NewRTPCodec(webrtc.RTPCodecTypeVideo, webrtc.H264, 90000, 0, fmtp, pti, new(codecs.H264Payloader))
+			}
+		}
+	}
+	if candidate != nil {
+		return candidate, nil
+	}
+	return rtsp.H264Codec, nil
 }
