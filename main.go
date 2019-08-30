@@ -33,6 +33,11 @@ func main() {
 	} else {
 		s.SetSecret(k)
 	}
+	if v := os.Getenv("WEBHOOK"); v != "" {
+		if err := s.SetWebhook(v); err != nil {
+			log.Fatalln("error: setting webhook:", err)
+		}
+	}
 	if v := os.Getenv("RTMP_URL"); v != "" {
 		s.AdvertiseRTMP = strings.TrimSuffix(v, "/") + "/live"
 	} else {
@@ -71,11 +76,6 @@ func main() {
 		log.Fatalln("error:", err)
 	}
 	eg.Go(func() error { return s.Channels.FTL.Serve() })
-	if v := os.Getenv("WEBHOOK"); v != "" {
-		if err := s.SetWebhook(v); err != nil {
-			log.Fatalln("error: setting webhook:", err)
-		}
-	}
 
 	eg.Go(func() error { return http.ListenAndServe(":8009", s.Handler()) })
 	if err := eg.Wait(); err != nil {
