@@ -10,7 +10,7 @@
         <div class="channel-card-title">
           <h1>{{ch.name}}</h1>
           <div class="channel-status">
-            <span v-if="ch.live" class="channel-live">LIVE</span>
+            <span v-if="ch.live" class="channel-live">LIVE <img src="/eye-solid.svg"> {{ch.viewers}} </span>
             <timeago v-if="!ch.live" class="channel-notlive" :datetime="ch.last" :auto-update="60" />
           </div>
         </div>

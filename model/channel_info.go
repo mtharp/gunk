@@ -8,6 +8,7 @@ type ChannelInfo struct {
 	Last    int64  `json:"last"`
 	Thumb   string `json:"thumb"`
 	LiveURL string `json:"live_url"`
+	Viewers int    `json:"viewers"`
 }
 
 func ListChannelInfo() (ret []*ChannelInfo, err error) {

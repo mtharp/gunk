@@ -38,7 +38,7 @@ type rtcSender struct {
 	addr   string
 }
 
-func HandleSDP(rw http.ResponseWriter, req *http.Request, src av.Demuxer) error {
+func HandleSDP(rw http.ResponseWriter, req *http.Request, src av.Demuxer, addViewer func(int)) error {
 	// parse offer
 	blob, err := ioutil.ReadAll(req.Body)
 	if err != nil {
@@ -91,6 +91,8 @@ func HandleSDP(rw http.ResponseWriter, req *http.Request, src av.Demuxer) error 
 	rw.Write(blob)
 	// serve in background
 	go func() {
+		addViewer(1)
+		defer addViewer(-1)
 		if err := sender.serve(src); err != nil {
 			log.Printf("error: serving rtc to %s: %s", req.RemoteAddr, err)
 		}

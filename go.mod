@@ -3,7 +3,7 @@ module eaglesong.dev/gunk
 go 1.12
 
 require (
-	eaglesong.dev/hls v0.0.1
+	eaglesong.dev/hls v0.2.0
 	github.com/cockroachdb/apd v1.1.0 // indirect
 	github.com/golang/mock v1.3.1 // indirect
 	github.com/golang/protobuf v1.3.2 // indirect

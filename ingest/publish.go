@@ -28,6 +28,8 @@ type Manager struct {
 	aac  map[string]*pubsub.Queue
 	opus map[string]*pubsub.Queue
 	hls  map[string]*hls.Publisher
+
+	viewers map[string]int
 }
 
 func (m *Manager) Initialize() {
@@ -67,6 +69,7 @@ func (m *Manager) Publish(auth model.ChannelAuth, kind, remote string, src av.De
 		m.aac = make(map[string]*pubsub.Queue)
 		m.opus = make(map[string]*pubsub.Queue)
 		m.hls = make(map[string]*hls.Publisher)
+		m.viewers = make(map[string]int)
 	}
 	if existing := m.aac[name]; existing != nil {
 		existing.Close()

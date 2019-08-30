@@ -23,6 +23,12 @@ func (m *Manager) queue(name string, opus bool) av.Demuxer {
 	return m.aac[name].Latest()
 }
 
+func (m *Manager) addViewer(name string, delta int) {
+	m.mu.Lock()
+	m.viewers[name] += delta
+	m.mu.Unlock()
+}
+
 func (m *Manager) ServeTS(rw http.ResponseWriter, req *http.Request, name string) error {
 	src := m.queue(name, false)
 	if src == nil {
@@ -33,6 +39,8 @@ func (m *Manager) ServeTS(rw http.ResponseWriter, req *http.Request, name string
 	muxer := ts.NewMuxer(rw)
 	streams, _ := src.Streams()
 	muxer.WriteHeader(streams)
+	m.addViewer(name, 1)
+	defer m.addViewer(name, -1)
 	return copyStream(req.Context(), muxer, src)
 }
 
@@ -52,7 +60,7 @@ func (m *Manager) ServeSDP(rw http.ResponseWriter, req *http.Request, name strin
 	if src == nil {
 		return ErrNoChannel
 	}
-	return playrtc.HandleSDP(rw, req, src)
+	return playrtc.HandleSDP(rw, req, src, func(delta int) { m.addViewer(name, delta) })
 }
 
 func (m *Manager) GetRTSPSource(req *rtsp.Request) (av.Demuxer, error) {
@@ -74,6 +82,7 @@ func (m *Manager) PopulateLive(infos []*model.ChannelInfo) {
 		if m.aac[info.Name] != nil {
 			info.Live = true
 		}
+		info.Viewers = m.viewers[info.Name] + m.hls[info.Name].Viewers()
 	}
 	m.mu.Unlock()
 }

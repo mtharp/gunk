@@ -1,6 +1,6 @@
 cloud.google.com/go v0.34.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
-eaglesong.dev/hls v0.0.1 h1:Gd/PQ53sQRhipfQQgmC2D8rsjZx74GHAXzsBK1wmftg=
-eaglesong.dev/hls v0.0.1/go.mod h1:ULcdNojmfqTLkLdPgjozCedeS7/HenYxHs1UsAbs9Ag=
+eaglesong.dev/hls v0.2.0 h1:3tKfz4nGVEsK1OkNFzPNlKD21ICmU8lMehK0++RF+K4=
+eaglesong.dev/hls v0.2.0/go.mod h1:ULcdNojmfqTLkLdPgjozCedeS7/HenYxHs1UsAbs9Ag=
 eaglesong.dev/joy4 v0.0.0-20190323221533-84311da2c824 h1:MmX7jUt8jJRhKcJdAOx/dGqDqU35K//bKokAzO67MoM=
 eaglesong.dev/joy4 v0.0.0-20190323221533-84311da2c824/go.mod h1:5AtUanNpFc/x/7rXp3aygmJTKtqrIwKJbokHo+pkEtE=
 github.com/cheekybits/genny v1.0.0 h1:uGGa4nei+j20rOSeDeP5Of12XVm7TGUd4dJA9RDitfE=
