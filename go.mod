@@ -14,7 +14,7 @@ require (
 	github.com/kr/pretty v0.1.0
 	github.com/lib/pq v1.1.1 // indirect
 	github.com/lucas-clemente/quic-go v0.7.1-0.20190825070216-f1d14ecdeafb // indirect
-	github.com/nareix/joy4 v0.0.0-20181022032202-3ddbc8f9d431
+	github.com/nareix/joy4 v0.0.0-20190831160920-566887487cc0
 	github.com/onsi/ginkgo v1.9.0 // indirect
 	github.com/onsi/gomega v1.7.0 // indirect
 	github.com/pion/dtls v1.5.1 // indirect
@@ -39,4 +39,4 @@ require (
 	layeh.com/gopus v0.0.0-20161224163843-0ebf989153aa
 )
 
-replace github.com/nareix/joy4 => eaglesong.dev/joy4 v0.0.0-20190323221533-84311da2c824
+replace github.com/nareix/joy4 => eaglesong.dev/joy4 v0.0.0-20190831160920-566887487cc0
