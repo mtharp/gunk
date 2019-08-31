@@ -35,6 +35,24 @@
           <b-form-input readonly :value="selected.rtmp_base" />
         </b-form-group>
       </b-form>
+      <div>
+        <strong>Recommended OBS settings (stream tab) for NVENC:</strong>
+        <ul>
+          <li>Keyframe Interval: 1 second</li>
+          <li>Preset: Low-Latency Quality</li>
+          <li>Profile: high</li>
+          <li>Max B-frames: 0</li>
+        </ul>
+        <strong>Recommended OBS settings (stream tab) for x264:</strong>
+        <ul>
+          <li>Keyframe Interval: 1 second</li>
+          <li>Preset: veryfast</li>
+          <li>Profile: high</li>
+          <li>Tune: zerolatency</li>
+          <li>x264 options: bframes=0</li>
+        </ul>
+        Make sure B-frames are disabled (set to 0) otherwise WebRTC will jitter.
+      </div>
     </b-modal>
   </div>
 </template>
