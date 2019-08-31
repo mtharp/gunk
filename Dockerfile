@@ -3,7 +3,7 @@ WORKDIR /work
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN go build -o /gunk -ldflags "-w -s" -v .
+RUN go build -o /gunk -ldflags "-w -s" -v -mod=readonly .
 
 FROM node AS uibuild
 WORKDIR /work

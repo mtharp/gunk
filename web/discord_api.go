@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"time"
@@ -41,7 +42,8 @@ func httpGet(ctx context.Context, cli *http.Client, uri string, body interface{}
 }
 
 func (s *Server) lookupUser(ctx context.Context, token *oauth2.Token) (user discordUser, err error) {
-	cli := oauth2.NewClient(ctx, oauth2.StaticTokenSource(token))
+	tsrc := s.oauth.TokenSource(ctx, token)
+	cli := oauth2.NewClient(ctx, tsrc)
 	if err = httpGet(ctx, cli, "https://discordapp.com/api/users/@me", &user); err != nil {
 		return
 	}
@@ -57,7 +59,12 @@ func (s *Server) lookupUser(ctx context.Context, token *oauth2.Token) (user disc
 			announce = true
 		}
 	}
-	err = model.SetUser(user.ID, token.RefreshToken, announce)
+	// persist the possibly-updated token back to database
+	newToken, err := tsrc.Token()
+	if err != nil {
+		return
+	}
+	err = model.SetUser(user.ID, newToken, announce)
 	return
 }
 
@@ -88,9 +95,17 @@ func (s *Server) doWebhook(auth model.ChannelAuth) error {
 	if s.webhookURL == "" || !auth.Announce {
 		return nil
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	msg := fmt.Sprintf("<@%s> is now live at %s/watch/%s", auth.UserID, s.BaseURL, url.PathEscape(auth.Name))
+	displayName := auth.Name
+	if auth.Token != nil && (auth.Token.Valid() || auth.Token.RefreshToken != "") {
+		userInfo, err := s.lookupUser(ctx, auth.Token)
+		if err != nil {
+			log.Printf("warning: failed to refresh user %d info: %s", auth.UserID, err)
+		}
+		displayName = userInfo.Username
+	}
+	msg := fmt.Sprintf("**%s** is now live at %s/watch/%s", displayName, s.BaseURL, url.PathEscape(auth.Name))
 	blob, _ := json.Marshal(webhookMessage{Content: msg})
 	req, err := http.NewRequest("POST", s.webhookURL, bytes.NewReader(blob))
 	if err != nil {
