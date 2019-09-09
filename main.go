@@ -87,7 +87,14 @@ func main() {
 		log.Fatalln("error:", err)
 	}
 	eg.Go(func() error { return s.Channels.FTL.Serve() })
-	eg.Go(func() error { return http.ListenAndServe(":8009", s.Handler()) })
+	eg.Go(func() error {
+		srv := &http.Server{
+			Addr:        ":8009",
+			Handler:     s.Handler(),
+			ReadTimeout: 15 * time.Second,
+		}
+		return srv.ListenAndServe()
+	})
 	go func() {
 		for range time.NewTicker(15 * time.Second).C {
 			s.Channels.Cleanup()
