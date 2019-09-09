@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -15,6 +16,8 @@ import (
 	"eaglesong.dev/gunk/web"
 	"github.com/nareix/joy4/format/rtmp"
 	"golang.org/x/sync/errgroup"
+
+	_ "net/http/pprof"
 )
 
 func main() {
@@ -57,6 +60,13 @@ func main() {
 	}
 	if err := model.Connect(); err != nil {
 		log.Fatalln("error: connecting to database:", err)
+	}
+	if v := os.Getenv("METRICS"); v != "" {
+		lis, err := net.Listen("tcp", v)
+		if err != nil {
+			log.Fatalln("error:", err)
+		}
+		go http.Serve(lis, nil)
 	}
 
 	eg := new(errgroup.Group)
