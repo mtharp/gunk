@@ -21,7 +21,12 @@ const (
 	grabInterval = 10 * time.Second
 )
 
-func Grab(channelName string, dm av.Demuxer) (<-chan time.Time, error) {
+type Result struct {
+	Time       time.Time
+	HasBframes bool
+}
+
+func Grab(channelName string, dm av.Demuxer) (<-chan Result, error) {
 	streams, err := dm.Streams()
 	if err != nil {
 		return nil, err
@@ -37,12 +42,13 @@ func Grab(channelName string, dm av.Demuxer) (<-chan time.Time, error) {
 	if vidIdx < 0 {
 		return nil, errors.New("no h264 stream found")
 	}
-	grabch := make(chan time.Time, 1)
+	grabch := make(chan Result, 1)
 	go func() {
 		defer close(grabch)
 		var buf bytes.Buffer
 		var keyTime time.Duration
 		var lastGrab time.Time
+		var lastBframe time.Duration
 		for {
 			pkt, err := dm.ReadPacket()
 			if err == io.EOF {
@@ -61,17 +67,33 @@ func Grab(channelName string, dm av.Demuxer) (<-chan time.Time, error) {
 					}
 					lastGrab = time.Now()
 					select {
-					case grabch <- lastGrab:
+					case grabch <- Result{
+						Time:       lastGrab,
+						HasBframes: lastBframe != 0,
+					}:
 					default:
 					}
 				}
 				buf.Reset()
 			}
-			if !pkt.IsKeyFrame {
-				continue
+			if pkt.IsKeyFrame {
+				h264util.WriteAnnexBPacket(&buf, pkt, vidCodec)
+				keyTime = pkt.Time
+			} else {
+				// check for bframes
+				nalus, _ := h264parser.SplitNALUs(pkt.Data)
+				for _, nalu := range nalus {
+					if !h264parser.IsDataNALU(nalu) {
+						continue
+					}
+					if sliceType, _ := h264parser.ParseSliceHeaderFromNALU(nalu); sliceType == h264parser.SLICE_B {
+						lastBframe = pkt.Time
+					}
+				}
+				if lastBframe != 0 && (pkt.Time-lastBframe) > 30*time.Second {
+					lastBframe = 0
+				}
 			}
-			h264util.WriteAnnexBPacket(&buf, pkt, vidCodec)
-			keyTime = pkt.Time
 		}
 	}()
 	return grabch, nil

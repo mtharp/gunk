@@ -4,10 +4,9 @@ import (
 	"context"
 	"io"
 	"log"
-	"sync"
+	"sync/atomic"
 	"time"
 
-	"eaglesong.dev/gunk/ingest/ftl"
 	"eaglesong.dev/gunk/model"
 	"eaglesong.dev/gunk/sinks/grabber"
 	"eaglesong.dev/gunk/transcode/opus"
@@ -19,24 +18,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type Manager struct {
-	OpusBitrate  int
-	PublishEvent PublishEvent
-	FTL          ftl.Server
-
-	mu   sync.Mutex
-	aac  map[string]*pubsub.Queue
-	opus map[string]*pubsub.Queue
-	hls  map[string]*hls.Publisher
-
-	viewers map[string]int
-}
-
-func (m *Manager) Initialize() {
-	m.FTL.Publish = m.Publish
-}
-
-type PublishEvent func(auth model.ChannelAuth, live bool, thumbTime time.Time)
+const hlsExpiry = 60 * time.Second
 
 func (m *Manager) Publish(auth model.ChannelAuth, kind, remote string, src av.Demuxer) error {
 	name := auth.Name
@@ -56,6 +38,7 @@ func (m *Manager) Publish(auth model.ChannelAuth, kind, remote string, src av.De
 	if err != nil {
 		return errors.Wrap(err, "setting up frame grabber")
 	}
+	aacq := q
 	opusq := q
 	switch audioType(streams) {
 	case opus.OPUS, 0:
@@ -64,63 +47,105 @@ func (m *Manager) Publish(auth model.ChannelAuth, kind, remote string, src av.De
 	}
 
 	// go live
-	m.mu.Lock()
-	if m.aac == nil {
-		m.aac = make(map[string]*pubsub.Queue)
-		m.opus = make(map[string]*pubsub.Queue)
-		m.hls = make(map[string]*hls.Publisher)
-		m.viewers = make(map[string]int)
-	}
-	if existing := m.aac[name]; existing != nil {
-		existing.Close()
-	}
-	m.aac[name] = q
-	m.opus[name] = opusq
-	p := m.hls[name]
-	if p != nil {
-		// stream restarted so viewer should reset their decoder
-		p.Discontinuity()
-	} else {
-		p = new(hls.Publisher)
-		m.hls[name] = p
-	}
-	m.mu.Unlock()
-
+	v, _ := m.channels.LoadOrStore(name, new(channel))
+	ch := v.(*channel)
+	p := ch.setStream(q, aacq, opusq)
 	defer func() {
 		log.Printf("[%s] publish of %s stopped", kind, auth.Name)
-		m.mu.Lock()
-		if m.aac[name] == q {
-			delete(m.aac, name)
-			delete(m.opus, name)
-		}
-		m.mu.Unlock()
+		ch.stopStream(q)
 		if m.PublishEvent != nil {
-			m.PublishEvent(auth, false, time.Time{})
+			m.PublishEvent(auth, false, grabber.Result{})
 		}
 	}()
 	// announce
 	log.Printf("[%s] user %s started publishing to %s from %s", kind, auth.UserID, auth.Name, remote)
 	if m.PublishEvent != nil {
-		m.PublishEvent(auth, true, time.Time{})
+		m.PublishEvent(auth, true, grabber.Result{})
 	}
 	// start outputs
 	eg.Go(func() error {
 		return errors.Wrap(avutil.CopyFile(p, q.Latest()), "hls publish")
 	})
 	eg.Go(func() error {
-		defer q.Close()
-		return copyStream(ctx, q, src)
-	})
-	eg.Go(func() error {
 		// notify ws clients when thumbnail is updated
-		for thumbTime := range grabch {
+		for thumb := range grabch {
 			if m.PublishEvent != nil {
-				m.PublishEvent(auth, true, thumbTime)
+				m.PublishEvent(auth, true, thumb)
+			}
+			if thumb.HasBframes {
+				atomic.StoreUintptr(&ch.rtc, 0)
+			} else {
+				atomic.StoreUintptr(&ch.rtc, 1)
 			}
 		}
 		return nil
 	})
+	// copy
+	eg.Go(func() error { return ch.copyStream(q, src) })
 	return eg.Wait()
+}
+
+func (m *Manager) Cleanup() {
+	m.channels.Range(func(k, v interface{}) bool {
+		v.(*channel).cleanup()
+		return true
+	})
+}
+
+func (ch *channel) setStream(q, aacq, opusq *pubsub.Queue) *hls.Publisher {
+	ch.mu.Lock()
+	defer ch.mu.Unlock()
+	if ch.ingest != nil {
+		ch.ingest.Close()
+	}
+	ch.ingest = q
+	ch.aac = aacq
+	ch.opus = opusq
+	if ch.hls != nil {
+		// stream restarted so viewer should reset their decoder
+		ch.hls.Discontinuity()
+	} else {
+		ch.hls = new(hls.Publisher)
+	}
+	ch.stoppedAt = time.Time{}
+	atomic.StoreUintptr(&ch.live, 1)
+	return ch.hls
+}
+
+func (ch *channel) stopStream(q *pubsub.Queue) {
+	ch.mu.Lock()
+	defer ch.mu.Unlock()
+	if ch.ingest != q {
+		return
+	}
+	atomic.StoreUintptr(&ch.live, 0)
+	ch.ingest = nil
+	ch.aac = nil
+	ch.opus = nil
+	ch.stoppedAt = time.Now()
+}
+
+func (ch *channel) copyStream(dest *pubsub.Queue, src av.Demuxer) error {
+	defer dest.Close()
+	for {
+		pkt, err := src.ReadPacket()
+		if err == io.EOF {
+			return nil
+		} else if err != nil {
+			return err
+		}
+		if err := dest.WritePacket(pkt); err != nil {
+			return err
+		}
+	}
+}
+
+func (ch *channel) cleanup() {
+	ch.mu.Lock()
+	if ch.hls != nil && !ch.stoppedAt.IsZero() && time.Since(ch.stoppedAt) > hlsExpiry {
+		ch.hls = nil
+	}
+	ch.mu.Unlock()
 }
 
 func audioType(streams []av.CodecData) av.CodecType {
@@ -142,19 +167,4 @@ func convertOpus(eg *errgroup.Group, q *pubsub.Queue, bitrate int) *pubsub.Queue
 		return errors.Wrap(opus.Convert(q.Latest(), ret, bitrate), "opus conversion")
 	})
 	return ret
-}
-
-func copyStream(ctx context.Context, dest av.PacketWriter, src av.PacketReader) error {
-	for ctx.Err() == nil {
-		pkt, err := src.ReadPacket()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return err
-		}
-		if err := dest.WritePacket(pkt); err != nil {
-			return err
-		}
-	}
-	return nil
 }

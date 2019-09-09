@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"eaglesong.dev/gunk/ingest/irtmp"
 	"eaglesong.dev/gunk/model"
@@ -76,8 +77,12 @@ func main() {
 		log.Fatalln("error:", err)
 	}
 	eg.Go(func() error { return s.Channels.FTL.Serve() })
-
 	eg.Go(func() error { return http.ListenAndServe(":8009", s.Handler()) })
+	go func() {
+		for range time.NewTicker(15 * time.Second).C {
+			s.Channels.Cleanup()
+		}
+	}()
 	if err := eg.Wait(); err != nil {
 		log.Fatalln("error:", err)
 	}

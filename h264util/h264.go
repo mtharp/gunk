@@ -33,20 +33,3 @@ func NALUToAVCC(nalu []byte) []byte {
 	copy(b[4:], nalu)
 	return b
 }
-
-// // AddEPBits adds emulation prevention bits to a raw NALU
-// func AddEPBits(nalu []byte) (ret []byte) {
-// 	for {
-// 		i := bytes.Index(nalu, []byte{0, 0})
-// 		if i < 0 || (i+2) >= len(nalu) || nalu[i+2] > 3 { // FIXME check
-// 			break
-// 		}
-// 		ret = append(ret, nalu[:i+2]...)
-// 		ret = append(ret, 3)
-// 		nalu = nalu[i+2:]
-// 	}
-// 	if ret == nil {
-// 		return nalu
-// 	}
-// 	return append(ret, nalu...)
-// }

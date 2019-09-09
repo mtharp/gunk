@@ -5,23 +5,24 @@ import (
 	"time"
 
 	"eaglesong.dev/gunk/model"
+	"eaglesong.dev/gunk/sinks/grabber"
 	"github.com/gorilla/websocket"
 	"github.com/pkg/errors"
 )
 
-func (s *Server) PublishEvent(auth model.ChannelAuth, live bool, thumbTime time.Time) {
-	if live && thumbTime.IsZero() {
+func (s *Server) PublishEvent(auth model.ChannelAuth, live bool, thumb grabber.Result) {
+	if live && thumb.Time.IsZero() {
 		go func() {
 			if err := s.doWebhook(auth); err != nil {
 				log.Printf("warning: invoking webhook for %s: %s", auth.Name, err)
 			}
 		}()
 	}
-	if !live || !thumbTime.IsZero() {
+	if !live || !thumb.Time.IsZero() {
 		ch := &model.ChannelInfo{
 			Name: auth.Name,
 			Live: live,
-			Last: thumbTime.UnixNano() / 1000000,
+			Last: thumb.Time.UnixNano() / 1000000,
 		}
 		s.populateChannel(ch)
 		s.ws.Broadcast(channelWS(ch))
