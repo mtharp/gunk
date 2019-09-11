@@ -49,7 +49,7 @@ func (m *Manager) Publish(auth model.ChannelAuth, kind, remote string, src av.De
 	// go live
 	v, _ := m.channels.LoadOrStore(name, new(channel))
 	ch := v.(*channel)
-	p := ch.setStream(q, aacq, opusq)
+	p := ch.setStream(q, aacq, opusq, m.WorkDir)
 	defer func() {
 		log.Printf("[%s] publish of %s stopped", kind, auth.Name)
 		ch.stopStream(q)
@@ -69,6 +69,7 @@ func (m *Manager) Publish(auth model.ChannelAuth, kind, remote string, src av.De
 	eg.Go(func() error {
 		// notify ws clients when thumbnail is updated
 		for thumb := range grabch {
+			ch.countHLSViewers()
 			if m.PublishEvent != nil {
 				m.PublishEvent(auth, true, thumb)
 			}
@@ -92,7 +93,7 @@ func (m *Manager) Cleanup() {
 	})
 }
 
-func (ch *channel) setStream(q, aacq, opusq *pubsub.Queue) *hls.Publisher {
+func (ch *channel) setStream(q, aacq, opusq *pubsub.Queue, workDir string) *hls.Publisher {
 	ch.mu.Lock()
 	defer ch.mu.Unlock()
 	if ch.ingest != nil {
@@ -105,7 +106,7 @@ func (ch *channel) setStream(q, aacq, opusq *pubsub.Queue) *hls.Publisher {
 		// stream restarted so viewer should reset their decoder
 		ch.hls.Discontinuity()
 	} else {
-		ch.hls = new(hls.Publisher)
+		ch.hls = &hls.Publisher{WorkDir: workDir}
 	}
 	ch.stoppedAt = time.Time{}
 	atomic.StoreUintptr(&ch.live, 1)
@@ -143,6 +144,7 @@ func (ch *channel) copyStream(dest *pubsub.Queue, src av.Demuxer) error {
 func (ch *channel) cleanup() {
 	ch.mu.Lock()
 	if ch.hls != nil && !ch.stoppedAt.IsZero() && time.Since(ch.stoppedAt) > hlsExpiry {
+		ch.hls.Close()
 		ch.hls = nil
 	}
 	ch.mu.Unlock()

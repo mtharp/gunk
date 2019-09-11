@@ -3,6 +3,7 @@ package ingest
 import (
 	"context"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -34,7 +35,18 @@ func (m *Manager) ServeTS(rw http.ResponseWriter, req *http.Request, name string
 }
 
 func (m *Manager) ServeHLS(rw http.ResponseWriter, req *http.Request, name string) error {
-	p := m.channel(name).getHLS()
+	ch := m.channel(name)
+	if ch == nil {
+		return ErrNoChannel
+	}
+	host, _, _ := net.SplitHostPort(req.RemoteAddr)
+	if host == "" {
+		host = req.RemoteAddr
+	}
+	if host != "" {
+		ch.hlsViewed(host)
+	}
+	p := ch.getHLS()
 	if p == nil {
 		return ErrNoChannel
 	}

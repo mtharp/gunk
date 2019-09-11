@@ -13,12 +13,15 @@ import (
 	"github.com/nareix/joy4/av/pubsub"
 )
 
+const hlsViewTimeout = 16 * time.Second
+
 type PublishEvent func(auth model.ChannelAuth, live bool, thumb grabber.Result)
 
 type Manager struct {
 	OpusBitrate  int
 	PublishEvent PublishEvent
 	FTL          ftl.Server
+	WorkDir      string
 
 	channels sync.Map
 }
@@ -36,7 +39,8 @@ type channel struct {
 
 	live, rtc uintptr
 	viewers   int32 // excluding hls
-	refPos    int64
+	hlsv      sync.Map
+	hlsvTotal int32
 }
 
 func (m *Manager) channel(name string) *channel {
@@ -79,6 +83,24 @@ func (ch *channel) addViewer(delta int32) {
 	atomic.AddInt32(&ch.viewers, delta)
 }
 
+func (ch *channel) hlsViewed(host string) {
+	ch.hlsv.Store(host, time.Now())
+}
+
+func (ch *channel) countHLSViewers() {
+	var views int32
+	ch.hlsv.Range(func(key, value interface{}) bool {
+		t := value.(time.Time)
+		if time.Since(t) > hlsViewTimeout {
+			ch.hlsv.Delete(key)
+		} else {
+			views++
+		}
+		return true
+	})
+	atomic.StoreInt32(&ch.hlsvTotal, views)
+}
+
 func (ch *channel) getHLS() *hls.Publisher {
 	if ch == nil {
 		return nil
@@ -91,8 +113,6 @@ func (ch *channel) getHLS() *hls.Publisher {
 
 func (ch *channel) currentViewers() int {
 	v := int(atomic.LoadInt32(&ch.viewers))
-	if p := ch.getHLS(); p != nil {
-		v += p.Viewers()
-	}
+	v += int(atomic.LoadInt32(&ch.hlsvTotal))
 	return v
 }
