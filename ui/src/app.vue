@@ -11,11 +11,18 @@
           <b-nav-item to="/">Home</b-nav-item>
           <b-nav-item to="/mychannels" v-if="$root.loggedIn">My Channels</b-nav-item>
           <b-nav-text>&bull; Watch:</b-nav-text>
-          <b-nav-item v-for="name in $root.liveChannels" :key="name" :to="$root.navChannel(name)">{{name}}</b-nav-item>
+          <b-nav-item
+            v-for="name in $root.liveChannels"
+            :key="name"
+            :to="$root.navChannel(name)"
+          >{{name}}</b-nav-item>
         </b-navbar-nav>
         <b-navbar-nav class="ml-auto">
           <b-nav-text v-if="$route.name == 'watch'">
             <b-button size="sm" class="mr-3" @click="$root.showStreamInfo = true">Info</b-button>
+            <b-button size="sm" class="mr-3" @click="$root.popVLC()">
+              <img src="/vlc.png" />VLC
+            </b-button>
             <b-form-radio-group buttons size="sm" class="mr-3" v-model="$root.playerType">
               <b-form-radio value="HLS">HLS</b-form-radio>
               <b-form-radio value="RTC">RTC</b-form-radio>
@@ -32,7 +39,7 @@
               rounded="circle"
               alt="your avatar"
               class="mr-3"
-              />
+            />
             <b-button size="sm" class="mr-sm-2" @click.prevent="$root.doLogout">Logout</b-button>
           </b-nav-form>
         </b-navbar-nav>

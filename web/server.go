@@ -44,6 +44,8 @@ func (s *Server) Handler() http.Handler {
 	r.HandleFunc("/ws", s.ws.ServeHTTP)
 	// video
 	r.HandleFunc("/live/{channel}.ts", s.viewPlayTS).Methods("GET").Name("live")
+	r.HandleFunc("/live/{channel}.ts", s.viewPublishTS).Methods("PUT", "POST")
+	r.HandleFunc("/live/{channel}.m3u8", s.viewPlaylist).Methods("GET")
 	r.HandleFunc("/hls/{channel}/{filename}", s.viewPlayHLS).Methods("GET")
 	// RTC
 	r.HandleFunc("/sdp/{channel}", s.viewPlaySDP).Methods("POST")

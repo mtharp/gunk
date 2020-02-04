@@ -11,7 +11,7 @@ Vue.use(BootstrapVue)
 import './assets/site.css'
 
 import VueTimeago from 'vue-timeago'
-Vue.use(VueTimeago, {locale: 'en'})
+Vue.use(VueTimeago, { locale: 'en' })
 
 Vue.config.productionTip = false
 Vue.config.ignoredElements = ["video-js"]
@@ -55,7 +55,10 @@ new Vue({
         })
     },
     navChannel(name) {
-      return {name: 'watch', params: {channel: name}}
+      return { name: 'watch', params: { channel: name } }
+    },
+    popVLC() {
+      window.location.href = "/live/" + encodeURIComponent(this.$route.params.channel) + ".m3u8"
     }
   },
   computed: {

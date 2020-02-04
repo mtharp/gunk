@@ -1,6 +1,7 @@
 package web
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -57,4 +58,14 @@ func (s *Server) viewThumb(rw http.ResponseWriter, req *http.Request) {
 	rw.Header().Set("Cache-Control", "max-age=86400, public, immutable")
 	rw.Header().Set("Content-Type", "image/jpeg")
 	rw.Write(jpeg)
+}
+
+func (s *Server) viewPlaylist(rw http.ResponseWriter, req *http.Request) {
+	chname := mux.Vars(req)["channel"]
+	liveU, _ := s.router.Get("live").URL("channel", chname)
+	if s.AdvertiseLive != nil {
+		liveU = s.AdvertiseLive.ResolveReference(liveU)
+	}
+	rw.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
+	fmt.Fprintln(rw, liveU)
 }
