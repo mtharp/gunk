@@ -4,7 +4,7 @@
 
 nav {
     background-color: #043;
-    height: 56px;
+    height: 48px;
     z-index: 1;
 }
 
@@ -13,7 +13,7 @@ nav .show, nav .collapsing {
     padding: 1rem;
 }
 
-.navbar-nav img {
+nav .btn-sm img {
     height: 1rem;
     width: 1rem;
     margin-right: 0.25rem;
