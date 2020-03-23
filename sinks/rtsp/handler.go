@@ -15,7 +15,7 @@ import (
 	"github.com/nareix/joy4/av"
 	"github.com/pion/rtp"
 	"github.com/pion/rtp/codecs"
-	"github.com/pion/sdp"
+	"github.com/pion/sdp/v2"
 	"github.com/pion/webrtc/v2"
 )
 
@@ -77,8 +77,11 @@ func (c *Conn) handleDescribe(req *Request) error {
 		}
 		pt++
 	}
-	blob := ses.Marshal()
-	return c.WriteResponse(req, 200, hdr, []byte(blob))
+	blob, err := ses.Marshal()
+	if err != nil {
+		return err
+	}
+	return c.WriteResponse(req, 200, hdr, blob)
 }
 
 func (c *Conn) handleSetup(req *Request) error {

@@ -59,6 +59,14 @@ new Vue({
     },
     popVLC() {
       window.location.href = "/live/" + encodeURIComponent(this.$route.params.channel) + ".m3u8"
+    },
+    currentChannel() {
+      for (let ch of Object.values(this.channels)) {
+        if (ch.name == this.$route.params.channel) {
+          return ch;
+        }
+      }
+      return null;
     }
   },
   computed: {
