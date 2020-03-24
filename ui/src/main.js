@@ -14,7 +14,6 @@ import VueTimeago from 'vue-timeago'
 Vue.use(VueTimeago, { locale: 'en' })
 
 Vue.config.productionTip = false
-Vue.config.ignoredElements = ["video-js"]
 
 let initialPlayerType = localStorage.getItem("playerType");
 if (initialPlayerType != "RTC") {
