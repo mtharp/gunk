@@ -25,9 +25,11 @@ export function attachHLS(video, hlsURL) {
         });
         hls.attachMedia(video);
         hls.loadSource(hlsURL);
+        hls.on(Hls.Events.MEDIA_ATTACHED, function () { video.play() });
         return function () { hls.destroy() };
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
         video.src = hlsURL;
+        video.addEventListener("canplay", function () { video.play() });
     }
     return function () { };
 }
@@ -35,6 +37,7 @@ export function attachHLS(video, hlsURL) {
 export function attachRTC(video, sdpURL) {
     video.controls = true;
     video.autoplay = true;
+    video.addEventListener("canplay", function () { video.play() });
     let pc = new RTCPeerConnection({
         iceServers: [{
             urls: [
@@ -57,6 +60,7 @@ export function attachRTC(video, sdpURL) {
     pc.addEventListener("icecandidate", function (ev) {
         if (ev.candidate !== null) {
             // still gathering candidates
+            return;
         }
         axios.post(sdpURL, pc.localDescription).then(function (d) {
             pc.setRemoteDescription(new RTCSessionDescription(d.data))
