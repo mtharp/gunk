@@ -1,5 +1,5 @@
 <template>
-  <video autoplay controls class="w-100 h-100" :poster="poster" />
+  <video class="w-100 h-100" muted :poster="poster"></video>
 </template>
 
 <script>
@@ -11,7 +11,27 @@ export default {
   data() {
     return { poster: this.$root.currentChannel().thumb };
   },
+  methods: {
+    autoplay() {
+      let video = this.$el;
+      video.play();
+      let vol = localStorage.getItem("volume");
+      if (vol) {
+        video.volume = vol / 100;
+      }
+      if (localStorage.getItem("unmute") == "true") {
+        video.muted = false;
+      }
+    },
+    saveVolume() {
+      let video = this.$el;
+      localStorage.setItem("unmute", !video.muted);
+      localStorage.setItem("volume", Math.round(video.volume * 100));
+    }
+  },
   mounted() {
+    let video = this.$el;
+    video.controls = true;
     var pc = new RTCPeerConnection({
       iceServers: [
         {
@@ -27,11 +47,13 @@ export default {
     pc.ontrack = ev => {
       this.ms.addTrack(ev.track);
       try {
-        this.$el.srcObject = this.ms;
+        video.srcObject = this.ms;
       } catch (error) {
         // backwards compat
-        this.$el.src = URL.createObjectURL(this.ms);
+        video.src = URL.createObjectURL(this.ms);
       }
+      this.autoplay();
+      video.addEventListener("volumechange", this.saveVolume);
     };
     pc.onicecandidate = ev => {
       if (ev.candidate === null) {

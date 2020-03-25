@@ -40,21 +40,6 @@ export default {
       }
       return {};
     },
-    baseURL() {
-      let base = window.location.protocol + "//" + window.location.hostname;
-      if (window.location.port != "") {
-        base += ":" + window.location.port;
-      }
-      return base;
-    },
-    hlsURL() {
-      return (
-        this.baseURL +
-        "/hls/" +
-        encodeURIComponent(this.channel) +
-        "/index.m3u8"
-      );
-    },
     liveURL() {
       let u = this.ch.live_url;
       if (!u) {
