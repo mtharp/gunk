@@ -1,6 +1,7 @@
 import Vue from 'vue'
 import Router from 'vue-router'
 import Home from './views/home.vue'
+import Watch from './views/watch.vue'
 
 Vue.use(Router)
 
@@ -21,7 +22,7 @@ export default new Router({
     {
       path: '/watch/:channel',
       name: 'watch',
-      component: () => import('./views/watch.vue'),
+      component: Watch,
       props: true,
     },
   ]

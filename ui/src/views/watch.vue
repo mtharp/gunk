@@ -8,10 +8,6 @@
     <img v-if="!ch.live" :src="ch.thumb" class="player-thumb" />
     <div v-if="!ch.live" class="player-shade">OFFLINE</div>
     <b-modal v-model="$root.showStreamInfo" title="Stream Info" ok-only>
-      <p>HLS URL:</p>
-      <p>
-        <strong>{{hlsURL}}</strong>
-      </p>
       <p>Live URL (for VLC)</p>
       <p>
         <strong>{{liveURL}}</strong>
