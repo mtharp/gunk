@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -21,6 +22,8 @@ import (
 )
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+	rand.Seed(time.Now().UnixNano())
 	base := strings.TrimSuffix(os.Getenv("BASE_URL"), "/")
 	u, err := url.Parse(base)
 	if err != nil {

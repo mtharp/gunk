@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	"eaglesong.dev/gunk/transcode/opus"
+	"github.com/nareix/joy4/codec/opusparser"
 )
 
 func (c *Conn) handleHMAC() error {
@@ -152,7 +152,7 @@ func (c *Conn) handleLive() error {
 			SSRC:        c.assrc,
 			PayloadType: c.apayload,
 			ClockRate:   48000,
-			Parser:      NullParser{Info: opus.NewCodecData(2)},
+			Parser:      NullParser{Info: opusparser.NewCodecData(2)},
 		}
 	default:
 		return fmt.Errorf("unsupported audio codec %q", c.acodec)

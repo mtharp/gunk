@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"eaglesong.dev/gunk/sinks/rtsp"
-	"eaglesong.dev/gunk/transcode/opus"
 	"github.com/nareix/joy4/av"
 	"github.com/pion/webrtc/v2"
 )
@@ -103,13 +102,12 @@ func (s *rtcSender) setupTracks(streams []av.CodecData, offer webrtc.SessionDesc
 		switch stream.Type() {
 		case av.H264:
 			codec = h264Codec
-		case opus.OPUS:
+		case av.OPUS:
 			codec = opusCodec
 		default:
 			return nil, fmt.Errorf("unsupported codec %s for RTSP", stream.Type())
 		}
-		name := codec.Type.String()
-		track, err := s.pc.NewTrack(codec.PayloadType, ssrc, name, name)
+		track, err := s.pc.NewTrack(codec.PayloadType, ssrc, randSeq(), randSeq())
 		if err != nil {
 			return nil, err
 		}
@@ -135,6 +133,15 @@ func (s *rtcSender) setupTracks(streams []av.CodecData, offer webrtc.SessionDesc
 		return nil, err
 	}
 	return &answer, nil
+}
+
+func randSeq() string {
+	letters := []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	b := make([]byte, 16)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
 }
 
 func (s *rtcSender) serve(src av.Demuxer) error {

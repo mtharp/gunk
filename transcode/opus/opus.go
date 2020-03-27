@@ -11,73 +11,11 @@ import (
 
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/av/pubsub"
+	"github.com/nareix/joy4/codec/opusparser"
 	"github.com/nareix/joy4/format/aac"
 	"golang.org/x/sync/errgroup"
 	"layeh.com/gopus"
 )
-
-var OPUS = av.MakeAudioCodecType(344444)
-
-type CodecData struct {
-	channels int
-}
-
-func NewCodecData(channels int) *CodecData {
-	return &CodecData{channels: channels}
-}
-
-func (d CodecData) Type() av.CodecType {
-	return OPUS
-}
-
-func (d CodecData) SampleRate() int {
-	return 48000
-}
-
-func (d CodecData) ChannelLayout() av.ChannelLayout {
-	switch d.channels {
-	case 1:
-		return av.CH_MONO
-	case 2:
-		return av.CH_STEREO
-	default:
-		panic("not implemented")
-	}
-}
-
-func (d CodecData) SampleFormat() av.SampleFormat {
-	return av.S16
-}
-
-func (d CodecData) PacketDuration(pkt []byte) (time.Duration, error) {
-	if len(pkt) < 1 {
-		return 0, errors.New("empty opus packet")
-	}
-	toc := pkt[0]
-	config := toc >> 3
-	//stereo := (toc & 0x4) != 0
-	code := toc & 0x3
-	numFr := 0
-	switch code {
-	case 0:
-		// one frame
-		if len(pkt) > 1 {
-			numFr = 1
-		}
-	case 1, 2:
-		// two frames
-		if len(pkt) > 2 {
-			numFr = 2
-		}
-	case 3:
-		// N frames
-		if len(pkt) < 2 {
-			return 0, errors.New("invalid opus packet")
-		}
-		numFr = int(pkt[1] & 0x3f)
-	}
-	return time.Duration(numFr) * opusFrameTimes[config], nil
-}
 
 // Convert the audio track from src to opus and write the result to dest.
 // Video tracks are copied as-is.
@@ -133,7 +71,7 @@ func Convert(src av.Demuxer, dest *pubsub.Queue, bitrate int) error {
 	}
 
 	// propagate opus header to output
-	newStreams[aidx] = &CodecData{channels: channels}
+	newStreams[aidx] = opusparser.NewCodecData(channels)
 	if err := dest.WriteHeader(newStreams); err != nil {
 		return err
 	}
@@ -210,48 +148,4 @@ func Convert(src av.Demuxer, dest *pubsub.Queue, bitrate int) error {
 		return err
 	}
 	return cmd.Wait()
-}
-
-var opusFrameTimes = []time.Duration{
-	// SILK NB
-	10 * time.Millisecond,
-	20 * time.Millisecond,
-	40 * time.Millisecond,
-	60 * time.Millisecond,
-	// SILK MB
-	10 * time.Millisecond,
-	20 * time.Millisecond,
-	40 * time.Millisecond,
-	60 * time.Millisecond,
-	// SILK WB
-	10 * time.Millisecond,
-	20 * time.Millisecond,
-	40 * time.Millisecond,
-	60 * time.Millisecond,
-	// Hybrid SWB
-	10 * time.Millisecond,
-	20 * time.Millisecond,
-	// Hybrid FB
-	10 * time.Millisecond,
-	20 * time.Millisecond,
-	// CELT NB
-	2500 * time.Microsecond,
-	5 * time.Millisecond,
-	10 * time.Millisecond,
-	20 * time.Millisecond,
-	// CELT WB
-	2500 * time.Microsecond,
-	5 * time.Millisecond,
-	10 * time.Millisecond,
-	20 * time.Millisecond,
-	// CELT SWB
-	2500 * time.Microsecond,
-	5 * time.Millisecond,
-	10 * time.Millisecond,
-	20 * time.Millisecond,
-	// CELT FB
-	2500 * time.Microsecond,
-	5 * time.Millisecond,
-	10 * time.Millisecond,
-	20 * time.Millisecond,
 }

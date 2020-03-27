@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 
-	"eaglesong.dev/gunk/transcode/opus"
 	"github.com/nareix/joy4/av"
 	"github.com/pion/rtp"
 	"github.com/pion/rtp/codecs"
@@ -52,7 +51,7 @@ func (c *Conn) handleDescribe(req *Request) error {
 		switch stream.Type() {
 		case av.H264:
 			codec = H264Codec
-		case opus.OPUS:
+		case av.OPUS:
 			codec = OpusCodec
 		default:
 			return fmt.Errorf("unsupported codec %s for RTSP", stream.Type())

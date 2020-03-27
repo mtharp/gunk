@@ -41,7 +41,7 @@ func (m *Manager) Publish(auth model.ChannelAuth, kind, remote string, src av.De
 	aacq := q
 	opusq := q
 	switch audioType(streams) {
-	case opus.OPUS, 0:
+	case av.OPUS, 0:
 	default:
 		opusq = convertOpus(eg, q, m.OpusBitrate)
 	}
