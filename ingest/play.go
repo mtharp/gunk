@@ -56,11 +56,12 @@ func (m *Manager) ServeHLS(rw http.ResponseWriter, req *http.Request, name strin
 
 func (m *Manager) ServeSDP(rw http.ResponseWriter, req *http.Request, name string) error {
 	ch := m.channel(name)
-	src := ch.queue(true)
-	if src == nil {
+	if ch == nil {
 		return ErrNoChannel
 	}
-	return playrtc.HandleSDP(rw, req, src, func(delta int) { ch.addViewer(int32(delta)) })
+	src := func() av.Demuxer { return ch.queue(true) }
+	addV := func(delta int) { ch.addViewer(int32(delta)) }
+	return playrtc.HandleSDP(rw, req, src, addV)
 }
 
 func (m *Manager) GetRTSPSource(req *rtsp.Request) (av.Demuxer, error) {

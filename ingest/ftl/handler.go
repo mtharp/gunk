@@ -163,7 +163,7 @@ func (c *Conn) handleLive() error {
 	pktSrc := &rtpReader{
 		ctx:        c.ctx,
 		rtpPackets: rch,
-		deframers:  []*Deframer{vdeframer /*, adeframer FIXME*/},
+		deframers:  []*Deframer{vdeframer, adeframer},
 	}
 	_ = adeframer
 	hashKeys := c.hashKeys(ip)

@@ -2,6 +2,7 @@ package playrtc
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -34,7 +35,7 @@ type rtcSender struct {
 	addr   string
 }
 
-func HandleSDP(rw http.ResponseWriter, req *http.Request, src av.Demuxer, addViewer func(int)) error {
+func HandleSDP(rw http.ResponseWriter, req *http.Request, src func() av.Demuxer, addViewer func(int)) error {
 	// parse offer
 	blob, err := ioutil.ReadAll(req.Body)
 	if err != nil {
@@ -46,7 +47,7 @@ func HandleSDP(rw http.ResponseWriter, req *http.Request, src av.Demuxer, addVie
 		return nil
 	}
 	// build tracks
-	streams, err := src.Streams()
+	streams, err := src().Streams()
 	if err != nil {
 		return err
 	}
@@ -139,8 +140,12 @@ func randSeq() string {
 	return string(b)
 }
 
-func (s *rtcSender) serve(src av.Demuxer) error {
+func (s *rtcSender) serve(src func() av.Demuxer) error {
 	defer s.pc.Close()
+	q := src()
+	if q == nil {
+		return errors.New("channel is gone")
+	}
 	for st := range s.state {
 		if st == webrtc.ICEConnectionStateConnected {
 			break
@@ -158,7 +163,7 @@ func (s *rtcSender) serve(src av.Demuxer) error {
 		default:
 		}
 
-		packet, err := src.ReadPacket()
+		packet, err := q.ReadPacket()
 		if err == io.EOF {
 			break
 		} else if err != nil {

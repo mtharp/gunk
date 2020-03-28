@@ -7,9 +7,11 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sync"
 	"time"
 
 	"github.com/nareix/joy4/av"
+	"github.com/nareix/joy4/av/pktque"
 	"github.com/nareix/joy4/av/pubsub"
 	"github.com/nareix/joy4/codec/opusparser"
 	"github.com/nareix/joy4/format/aac"
@@ -63,8 +65,6 @@ func Convert(src av.Demuxer, dest *pubsub.Queue, bitrate int) error {
 		return err
 	}
 	defer stdout.Close()
-	//var errmsg bytes.Buffer
-	//cmd.Stderr = &errmsg
 	cmd.Stderr = os.Stderr
 	if err := cmd.Start(); err != nil {
 		return err
@@ -75,6 +75,9 @@ func Convert(src av.Demuxer, dest *pubsub.Queue, bitrate int) error {
 	if err := dest.WriteHeader(newStreams); err != nil {
 		return err
 	}
+
+	vdelay := pktque.NewBuf()
+	var vdmu sync.Mutex
 
 	eg, ctx := errgroup.WithContext(ctx)
 	// remux audio and send to ffmpeg
@@ -96,9 +99,10 @@ func Convert(src av.Demuxer, dest *pubsub.Queue, bitrate int) error {
 					return err
 				}
 			} else {
-				if err := dest.WritePacket(pkt); err != nil {
-					return err
-				}
+				// buffer video packets until transcoded audio arrives
+				vdmu.Lock()
+				vdelay.Push(pkt)
+				vdmu.Unlock()
 			}
 		}
 		return nil
@@ -137,6 +141,14 @@ func Convert(src av.Demuxer, dest *pubsub.Queue, bitrate int) error {
 			if err := dest.WritePacket(pkt); err != nil {
 				return err
 			}
+			// mux delayed video packets
+			vdmu.Lock()
+			for vdelay.Count > 0 && vdelay.Get(vdelay.Head).Time >= ts {
+				if err := dest.WritePacket(vdelay.Pop()); err != nil {
+					return err
+				}
+			}
+			vdmu.Unlock()
 			ts += packetLength
 		}
 		return nil
