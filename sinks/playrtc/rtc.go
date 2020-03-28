@@ -27,6 +27,7 @@ var rtcConf = webrtc.Configuration{
 }
 
 type rtcSender struct {
+	media  webrtc.MediaEngine
 	pc     *webrtc.PeerConnection
 	state  chan webrtc.ICEConnectionState
 	tracks []*rtsp.TrackFramer
@@ -50,20 +51,16 @@ func HandleSDP(rw http.ResponseWriter, req *http.Request, src av.Demuxer, addVie
 		return err
 	}
 	var m webrtc.MediaEngine
-	h264Codec, opusCodec, err := chooseCodec(offer.SDP)
-	if err != nil {
-		log.Printf("unable to determine codec attributes: %s", err)
-		http.Error(rw, "invalid offer", 400)
-		return nil
+	if err := m.PopulateFromSDP(offer); err != nil {
+		return fmt.Errorf("populate from SDP: %w", err)
 	}
-	m.RegisterCodec(h264Codec)
-	m.RegisterCodec(opusCodec)
 	api := webrtc.NewAPI(webrtc.WithMediaEngine(m))
 	peerConnection, err := api.NewPeerConnection(rtcConf)
 	if err != nil {
 		return err
 	}
 	sender := &rtcSender{
+		media:  m,
 		pc:     peerConnection,
 		state:  make(chan webrtc.ICEConnectionState, 1),
 		tracks: make([]*rtsp.TrackFramer, len(streams)),
@@ -73,7 +70,7 @@ func HandleSDP(rw http.ResponseWriter, req *http.Request, src av.Demuxer, addVie
 		log.Printf("[rtc] %s connection state: %s", req.RemoteAddr, state)
 		sender.state <- state
 	})
-	answer, err := sender.setupTracks(streams, offer, h264Codec, opusCodec)
+	answer, err := sender.setupTracks(streams, offer)
 	if err != nil {
 		peerConnection.Close()
 		return err
@@ -95,23 +92,21 @@ func HandleSDP(rw http.ResponseWriter, req *http.Request, src av.Demuxer, addVie
 	return nil
 }
 
-func (s *rtcSender) setupTracks(streams []av.CodecData, offer webrtc.SessionDescription, h264Codec, opusCodec *webrtc.RTPCodec) (*webrtc.SessionDescription, error) {
+func (s *rtcSender) setupTracks(streams []av.CodecData, offer webrtc.SessionDescription) (*webrtc.SessionDescription, error) {
 	ssrc := rand.Uint32()
 	for i, stream := range streams {
-		var codec *webrtc.RTPCodec
-		switch stream.Type() {
-		case av.H264:
-			codec = h264Codec
-		case av.OPUS:
-			codec = opusCodec
-		default:
+		codec := s.findCodec(stream)
+		if codec == nil {
 			return nil, fmt.Errorf("unsupported codec %s for RTSP", stream.Type())
 		}
 		track, err := s.pc.NewTrack(codec.PayloadType, ssrc, randSeq(), randSeq())
 		if err != nil {
 			return nil, err
 		}
-		if _, err := s.pc.AddTrack(track); err != nil {
+		sconf := webrtc.RtpTransceiverInit{
+			Direction: chooseDirection(offer),
+		}
+		if _, err := s.pc.AddTransceiverFromTrack(track, sconf); err != nil {
 			return nil, err
 		}
 		s.tracks[i] = &rtsp.TrackFramer{

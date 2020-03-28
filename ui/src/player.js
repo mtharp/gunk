@@ -50,9 +50,9 @@ export function attachRTC(video, sdpURL) {
     let ms = new MediaStream();
     pc.addEventListener("track", function (ev) {
         ms.addTrack(ev.track);
-        try {
+        if ("srcObject" in video) {
             video.srcObject = ms;
-        } catch (error) {
+        } else {
             // backwards compat
             video.src = URL.createObjectURL(ms);
         }
@@ -68,8 +68,8 @@ export function attachRTC(video, sdpURL) {
     });
     var offerArgs = {};
     try {
-        pc.addTransceiver("audio");
-        pc.addTransceiver("video");
+        pc.addTransceiver("audio", { direction: "recvonly" });
+        pc.addTransceiver("video", { direction: "recvonly" });
     } catch (error) {
         // backwards compat
         offerArgs = { offerToReceiveVideo: true, offerToReceiveAudio: true };

@@ -1,70 +1,50 @@
 package playrtc
 
 import (
-	"strconv"
 	"strings"
 
-	"eaglesong.dev/gunk/sinks/rtsp"
-	"github.com/pion/rtp/codecs"
+	"github.com/nareix/joy4/av"
 	"github.com/pion/sdp/v2"
 	"github.com/pion/webrtc/v2"
 )
 
-// firefox is very picky about payload type numbers, even when everything else matches. so to appease it, parse its offer to figure out what payload type numbers it wants to use.
-func chooseCodec(offer string) (h264Codec, opusCodec *webrtc.RTPCodec, err error) {
+func (s *rtcSender) findCodec(cd av.CodecData) *webrtc.RTPCodec {
+	kind := webrtc.RTPCodecTypeAudio
+	if cd.Type().IsVideo() {
+		kind = webrtc.RTPCodecTypeVideo
+	}
+	wantName := strings.ToLower(cd.Type().String())
+	codecs := s.media.GetCodecsByKind(kind)
+	var chosen *webrtc.RTPCodec
+	for _, codec := range codecs {
+		if strings.ToLower(codec.Name) == wantName {
+			if chosen == nil || chosen.PayloadType < codec.PayloadType {
+				chosen = codec
+			}
+		}
+	}
+	return chosen
+}
+
+// browsers like safari that don't support addTransceiver don't seem to have a way to create recvonly tracks, so try to use sendonly if the browser requested recvonly but fall back to sendrecv if needed
+func chooseDirection(offer webrtc.SessionDescription) webrtc.RTPTransceiverDirection {
 	var parsed sdp.SessionDescription
-	if err := parsed.Unmarshal([]byte(offer)); err != nil {
-		return nil, nil, err
+	if err := parsed.Unmarshal([]byte(offer.SDP)); err != nil {
+		return webrtc.RTPTransceiverDirectionSendrecv
 	}
+	var recvonly bool
 	for _, media := range parsed.MediaDescriptions {
-		codecNames := make(map[string]string)
-		for _, attr := range media.Attributes {
-			if attr.Key != "rtpmap" {
-				continue
-			}
-			// 126 H264/90000
-			i := strings.IndexRune(attr.Value, ' ')
-			j := strings.IndexRune(attr.Value, '/')
-			if i < 0 || j < i {
-				continue
-			}
-			payloadType := attr.Value[:i]
-			codecName := attr.Value[i+1 : j]
-			codecNames[payloadType] = strings.ToLower(codecName)
-		}
-		for _, attr := range media.Attributes {
-			if attr.Key != "fmtp" {
-				continue
-			}
-			// 126 profile-level-id=42e01f;level-asymmetry-allowed=1;packetization-mode=1
-			i := strings.IndexRune(attr.Value, ' ')
-			if i < 0 {
-				continue
-			}
-			payloadType := attr.Value[:i]
-			fmtp := attr.Value[i+1:]
-			pti64, err := strconv.ParseUint(payloadType, 10, 8)
-			if err != nil {
-				continue
-			}
-			pti := uint8(pti64)
-			switch codecNames[payloadType] {
-			case "h264":
-				if h264Codec == nil || h264Codec.PayloadType > pti {
-					h264Codec = webrtc.NewRTPCodec(webrtc.RTPCodecTypeVideo, webrtc.H264, 90000, 0, fmtp, pti, new(codecs.H264Payloader))
-				}
-			case "opus":
-				if opusCodec == nil || opusCodec.PayloadType > pti {
-					opusCodec = webrtc.NewRTPOpusCodec(pti, 48000)
-				}
+		for _, att := range media.Attributes {
+			switch att.Key {
+			case "recvonly":
+				recvonly = true
+			case "sendrecv":
+				return webrtc.RTPTransceiverDirectionSendrecv
 			}
 		}
 	}
-	if h264Codec == nil {
-		h264Codec = rtsp.H264Codec
+	if recvonly {
+		return webrtc.RTPTransceiverDirectionSendonly
 	}
-	if opusCodec == nil {
-		opusCodec = rtsp.OpusCodec
-	}
-	return
+	return webrtc.RTPTransceiverDirectionSendrecv
 }
