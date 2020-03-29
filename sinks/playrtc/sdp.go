@@ -8,7 +8,7 @@ import (
 	"github.com/pion/webrtc/v2"
 )
 
-func (s *rtcSender) findCodec(cd av.CodecData) *webrtc.RTPCodec {
+func (s *Sender) findCodec(cd av.CodecData) *webrtc.RTPCodec {
 	kind := webrtc.RTPCodecTypeAudio
 	if cd.Type().IsVideo() {
 		kind = webrtc.RTPCodecTypeVideo

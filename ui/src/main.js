@@ -1,7 +1,8 @@
 import Vue from 'vue'
 import App from './app.vue'
 import router from './router'
-import axios from 'axios';
+import axios from 'axios'
+// import WSSession from './ws.js'
 
 import 'bootstrap/dist/css/bootstrap.css'
 import 'bootstrap-vue/dist/bootstrap-vue.css'
@@ -86,6 +87,7 @@ new Vue({
     this.chinterval = window.setInterval(this.updateChannels, 5000)
     this.userinterval = window.setInterval(this.updateUser, 300000)
     this.unwatch = this.$watch("playerType", v => localStorage.setItem("playerType", v))
+    // this.ws = new WSSession(location);
   },
   beforeDestroy() {
     window.clearInterval(this.chinterval)

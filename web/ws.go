@@ -5,47 +5,56 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"sync"
 	"time"
 
-	"eaglesong.dev/gunk/model"
+	"eaglesong.dev/gunk/ingest"
+	"eaglesong.dev/gunk/sinks/playrtc"
 	"github.com/gorilla/websocket"
+	"github.com/pion/webrtc/v2"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
 
 var wsu = websocket.Upgrader{HandshakeTimeout: 10 * time.Second}
 
-type listener chan<- wsMsg
-
-type websockets struct {
-	mu        sync.Mutex
-	listeners map[listener]struct{}
-
-	OnNew func(*websocket.Conn) error
+type wsConn struct {
+	conn  *websocket.Conn
+	rtc   *playrtc.Sender
+	send  chan wsMsg
+	chans *ingest.Manager
 }
 
 type wsMsg struct {
-	Type    string             `json:"type"`
-	Channel *model.ChannelInfo `json:"channel,omitempty"`
+	Type string `json:"type"`
+	Name string `json:"name,omitempty"`
+
+	SDP       *webrtc.SessionDescription `json:"sdp,omitempty"`
+	Candidate *webrtc.ICECandidateInit   `json:"candidate,omitempty"`
 }
 
-func channelWS(i *model.ChannelInfo) wsMsg {
-	return wsMsg{Type: "channel", Channel: i}
-}
-
-func (w *websockets) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+func (s *Server) serveWS(rw http.ResponseWriter, req *http.Request) {
 	conn, err := wsu.Upgrade(rw, req, nil)
 	if err != nil {
 		log.Println("error: websocket upgrade:", err)
 		return
 	}
-	eg, ctx := errgroup.WithContext(req.Context())
-	eg.Go(func() error { return w.drainLoop(ctx, conn) })
-	eg.Go(func() error { return w.sendLoop(ctx, conn) })
+	w := &wsConn{
+		conn:  conn,
+		send:  make(chan wsMsg, 10),
+		chans: &s.Channels,
+	}
+	ctx, cancel := context.WithCancel(req.Context())
+	defer cancel()
+	eg, ctx := errgroup.WithContext(ctx)
+	eg.Go(func() error { return w.recvLoop(ctx) })
+	eg.Go(func() error { return w.sendLoop(ctx) })
 	eg.Go(func() error {
 		<-ctx.Done()
 		conn.Close()
+		if w.rtc != nil {
+			w.rtc.Close()
+			w.rtc = nil
+		}
 		return nil
 	})
 	if err := eg.Wait(); err != nil && err != io.EOF {
@@ -53,63 +62,115 @@ func (w *websockets) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (w *websockets) Broadcast(msg wsMsg) {
-	w.mu.Lock()
-	for listener := range w.listeners {
-		select {
-		case listener <- msg:
-		default:
-			// on overflow force the client to reconnect
-			delete(w.listeners, listener)
-			close(listener)
-		}
-	}
-	w.mu.Unlock()
-}
-
-func (w *websockets) drainLoop(ctx context.Context, conn *websocket.Conn) error {
+func (w *wsConn) recvLoop(ctx context.Context) error {
 	for ctx.Err() == nil {
-		if _, _, err := conn.NextReader(); err != nil {
+		var m wsMsg
+		if err := w.conn.ReadJSON(&m); err != nil {
 			if ctx.Err() == nil && !websocket.IsCloseError(err, websocket.CloseGoingAway) {
 				return errors.Wrap(err, "read")
 			}
 			break
 		}
+		if err := w.handle(m); err != nil {
+			return err
+		}
 	}
 	return io.EOF
 }
 
-func (w *websockets) sendLoop(ctx context.Context, conn *websocket.Conn) error {
-	ch := make(chan wsMsg, 10)
-	w.mu.Lock()
-	if w.listeners == nil {
-		w.listeners = make(map[listener]struct{})
-	}
-	w.listeners[ch] = struct{}{}
-	w.mu.Unlock()
-	defer func() {
-		w.mu.Lock()
-		delete(w.listeners, ch)
-		w.mu.Unlock()
-	}()
-	if w.OnNew != nil {
-		if err := w.OnNew(conn); err != nil {
-			return err
-		}
-	}
+func (w *wsConn) sendLoop(ctx context.Context) error {
 	for ctx.Err() == nil {
 		select {
 		case <-ctx.Done():
 			return nil
-		case msg, ok := <-ch:
+		case msg, ok := <-w.send:
 			if !ok {
-				// channel closed after a prior send overflowed
 				return io.EOF
 			}
-			if err := conn.WriteJSON(msg); err != nil {
+			if err := w.conn.WriteJSON(msg); err != nil {
 				return errors.Wrap(err, "write")
 			}
 		}
 	}
 	return nil
+}
+
+func (w *wsConn) handle(m wsMsg) error {
+	switch m.Type {
+	case "offer":
+		if w.rtc != nil {
+			w.rtc.Close()
+			w.rtc = nil
+		}
+		if m.SDP == nil {
+			return errors.New("missing sdp")
+		}
+		o := playrtc.OfferToReceive{Offer: *m.SDP}
+		o.Remote = w.conn.RemoteAddr().String()
+		o.SendCandidate = func(cand webrtc.ICECandidateInit) {
+			w.send <- wsMsg{
+				Type:      "candidate",
+				Candidate: &cand,
+			}
+		}
+		s, err := w.chans.AnswerSDP(o, m.Name)
+		if err != nil {
+			return err
+		}
+		answer := s.SDP()
+		w.send <- wsMsg{
+			Type: "answer",
+			SDP:  &answer,
+		}
+		w.rtc = s
+		return nil
+	case "play":
+		if w.rtc != nil {
+			w.rtc.Close()
+			w.rtc = nil
+		}
+		var p playrtc.PlayRequest
+		p.Remote = w.conn.RemoteAddr().String()
+		p.SendCandidate = func(cand webrtc.ICECandidateInit) {
+			w.send <- wsMsg{
+				Type:      "candidate",
+				Candidate: &cand,
+			}
+		}
+		s, err := w.chans.OfferSDP(p, m.Name)
+		if err != nil {
+			return err
+		}
+		offer := s.SDP()
+		w.send <- wsMsg{
+			Type: "offer",
+			SDP:  &offer,
+		}
+		w.rtc = s
+		return nil
+	case "answer":
+		if m.SDP == nil {
+			return errors.New("missing sdp")
+		}
+		if w.rtc == nil {
+			return errors.New("no session")
+		}
+		return w.rtc.SetAnswer(*m.SDP)
+	case "candidate":
+		if m.Candidate == nil {
+			return errors.New("missing candidate")
+		}
+		if w.rtc != nil {
+			w.rtc.Candidate(*m.Candidate)
+		}
+		return nil
+	case "stop":
+		if w.rtc != nil {
+			w.rtc.Close()
+			w.rtc = nil
+		}
+		return nil
+	default:
+		return errors.New("invalid message type " + m.Type)
+	}
 }

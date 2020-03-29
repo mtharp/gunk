@@ -64,6 +64,26 @@ func (m *Manager) ServeSDP(rw http.ResponseWriter, req *http.Request, name strin
 	return playrtc.HandleSDP(rw, req, src, addV)
 }
 
+func (m *Manager) AnswerSDP(o playrtc.OfferToReceive, name string) (*playrtc.Sender, error) {
+	ch := m.channel(name)
+	if ch == nil {
+		return nil, ErrNoChannel
+	}
+	o.Source = func() av.Demuxer { return ch.queue(true) }
+	o.AddViewer = func(delta int) { ch.addViewer(int32(delta)) }
+	return o.Answer()
+}
+
+func (m *Manager) OfferSDP(r playrtc.PlayRequest, name string) (*playrtc.Sender, error) {
+	ch := m.channel(name)
+	if ch == nil {
+		return nil, ErrNoChannel
+	}
+	r.Source = func() av.Demuxer { return ch.queue(true) }
+	r.AddViewer = func(delta int) { ch.addViewer(int32(delta)) }
+	return r.OfferToSend()
+}
+
 func (m *Manager) GetRTSPSource(req *rtsp.Request) (av.Demuxer, error) {
 	chname := req.URL.Path
 	if strings.HasPrefix(chname, "/") {

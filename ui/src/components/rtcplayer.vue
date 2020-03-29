@@ -14,9 +14,12 @@ export default {
     this.$nextTick(() => restoreVolume(video));
     let sdpURL = "/sdp/" + encodeURIComponent(this.channel);
     this.destroyPlayer = attachRTC(video, sdpURL);
+    // this.destroyPlayer = attachRTCOffer(video, this.$root.ws, this.channel);
   },
   beforeDestroy() {
-    this.destroyPlayer();
+    if (this.destroyPlayer) {
+      this.destroyPlayer();
+    }
   }
 };
 </script>

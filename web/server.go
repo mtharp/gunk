@@ -22,7 +22,6 @@ type Server struct {
 	key    [32]byte
 	router *mux.Router
 	oauth  oauth2.Config
-	ws     websockets
 
 	webhookURL string
 	checkGuild string
@@ -31,7 +30,6 @@ type Server struct {
 }
 
 func (s *Server) Initialize() {
-	s.ws.OnNew = s.onWebsocket
 	s.Channels.PublishEvent = s.PublishEvent
 	s.Channels.FTL.CheckUser = model.VerifyFTL
 	s.Channels.FTL.Publish = s.Channels.Publish
@@ -41,7 +39,7 @@ func (s *Server) Initialize() {
 func (s *Server) Handler() http.Handler {
 	r := mux.NewRouter()
 	s.router = r
-	r.HandleFunc("/ws", s.ws.ServeHTTP)
+	r.HandleFunc("/ws", s.serveWS)
 	// video
 	r.HandleFunc("/live/{channel}.ts", s.viewPlayTS).Methods("GET").Name("live")
 	r.HandleFunc("/live/{channel}.ts", s.viewPublishTS).Methods("PUT", "POST")
