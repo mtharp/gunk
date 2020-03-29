@@ -24,12 +24,13 @@
     "babel-eslint": "^10.0.2",
     "eslint": "^6.8.0",
     "eslint-plugin-vue": "^6.1.2",
+    "semistandard": "^14.2.0",
     "vue-template-compiler": "^2.5.21"
   },
   "eslintConfig": {
     "root": true,
     "env": {
-      "node": true
+      "browser": true
     },
     "extends": [
       "plugin:vue/essential",
@@ -39,6 +40,9 @@
     "parserOptions": {
       "parser": "babel-eslint"
     }
+  },
+  "semistandard": {
+      "envs": ["browser"]
   },
   "postcss": {
     "plugins": {
