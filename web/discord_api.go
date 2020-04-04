@@ -101,9 +101,10 @@ func (s *Server) doWebhook(auth model.ChannelAuth) error {
 	if auth.Token != nil && (auth.Token.Valid() || auth.Token.RefreshToken != "") {
 		userInfo, err := s.lookupUser(ctx, auth.Token)
 		if err != nil {
-			log.Printf("warning: failed to refresh user %d info: %s", auth.UserID, err)
+			log.Printf("warning: failed to refresh user %s info: %s", auth.UserID, err)
+		} else {
+			displayName = userInfo.Username
 		}
-		displayName = userInfo.Username
 	}
 	msg := fmt.Sprintf("**%s** is now live at %s/watch/%s", displayName, s.BaseURL, url.PathEscape(auth.Name))
 	blob, _ := json.Marshal(webhookMessage{Content: msg})

@@ -9,14 +9,11 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"time"
 
 	"eaglesong.dev/gunk/sinks/rtsp"
 	"github.com/nareix/joy4/av"
 	"github.com/pion/webrtc/v2"
 )
-
-const rtcIdleTime = 5 * time.Second
 
 var rtcConf = webrtc.Configuration{
 	ICEServers: []webrtc.ICEServer{{
@@ -78,13 +75,10 @@ func HandleSDP(rw http.ResponseWriter, req *http.Request, src func() av.Demuxer,
 	if err != nil {
 		return err
 	}
-	a := time.Now()
 	var m webrtc.MediaEngine
 	if err := m.PopulateFromSDP(offer); err != nil {
 		return fmt.Errorf("populate from SDP: %w", err)
 	}
-	log.Println("a", time.Since(a))
-	a = time.Now()
 	gatherDone := make(chan struct{})
 	pr := PlayRequest{
 		Source:     src,
@@ -96,15 +90,11 @@ func HandleSDP(rw http.ResponseWriter, req *http.Request, src func() av.Demuxer,
 	if err != nil {
 		return err
 	}
-	log.Println("b", time.Since(a))
-	a = time.Now()
 	direction := chooseDirection(offer)
 	if err := s.setupTracks(streams, direction); err != nil {
 		s.Close()
 		return err
 	}
-	log.Println("c", time.Since(a))
-	a = time.Now()
 	// build answer
 	if err := s.pc.SetRemoteDescription(offer); err != nil {
 		s.Close()
@@ -119,11 +109,7 @@ func HandleSDP(rw http.ResponseWriter, req *http.Request, src func() av.Demuxer,
 		s.Close()
 		return err
 	}
-	log.Println("d", time.Since(a))
-	a = time.Now()
 	<-gatherDone
-	log.Println("e", time.Since(a))
-	a = time.Now()
 	sdp := s.pc.LocalDescription()
 	blob, err = json.Marshal(sdp)
 	if err != nil {

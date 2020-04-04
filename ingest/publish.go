@@ -12,7 +12,6 @@ import (
 	"eaglesong.dev/gunk/transcode/opus"
 	"eaglesong.dev/hls"
 	"github.com/nareix/joy4/av"
-	"github.com/nareix/joy4/av/avutil"
 	"github.com/nareix/joy4/av/pubsub"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
@@ -64,7 +63,7 @@ func (m *Manager) Publish(auth model.ChannelAuth, kind, remote string, src av.De
 	}
 	// start outputs
 	eg.Go(func() error {
-		return errors.Wrap(avutil.CopyFile(p, q.Latest()), "hls publish")
+		return errors.Wrap(ch.copyHLS(p, q.Latest()), "hls publish")
 	})
 	eg.Go(func() error {
 		// notify ws clients when thumbnail is updated
@@ -106,7 +105,11 @@ func (ch *channel) setStream(q, aacq, opusq *pubsub.Queue, workDir string) *hls.
 		// stream restarted so viewer should reset their decoder
 		ch.hls.Discontinuity()
 	} else {
-		ch.hls = &hls.Publisher{WorkDir: workDir}
+		ch.hls = &hls.Publisher{
+			WorkDir: workDir,
+			// Prefetch:  true,
+			// Precreate: 1,
+		}
 	}
 	ch.stoppedAt = time.Time{}
 	atomic.StoreUintptr(&ch.live, 1)
@@ -136,6 +139,32 @@ func (ch *channel) copyStream(dest *pubsub.Queue, src av.Demuxer) error {
 			return err
 		}
 		if err := dest.WritePacket(pkt); err != nil {
+			return err
+		}
+	}
+}
+
+func (ch *channel) copyHLS(dest *hls.Publisher, src av.Demuxer) error {
+	var streams []av.CodecData
+	var err error
+	if streams, err = src.Streams(); err != nil {
+		return err
+	}
+	if err = dest.WriteHeader(streams); err != nil {
+		return err
+	}
+	for {
+		pkt, err := src.ReadPacket()
+		if err == io.EOF {
+			return nil
+		} else if err != nil {
+			return err
+		}
+		ep := hls.ExtendedPacket{Packet: pkt}
+		if pkt.IsKeyFrame {
+			ep.ProgramTime = time.Now()
+		}
+		if err := dest.WriteExtendedPacket(ep); err != nil {
 			return err
 		}
 	}

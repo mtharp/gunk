@@ -27,6 +27,7 @@ type wsConn struct {
 type wsMsg struct {
 	Type string `json:"type"`
 	Name string `json:"name,omitempty"`
+	Time int64  `json:"time,omitempty"`
 
 	SDP       *webrtc.SessionDescription `json:"sdp,omitempty"`
 	Candidate *webrtc.ICECandidateInit   `json:"candidate,omitempty"`
@@ -79,6 +80,7 @@ func (w *wsConn) recvLoop(ctx context.Context) error {
 }
 
 func (w *wsConn) sendLoop(ctx context.Context) error {
+	t := time.NewTicker(time.Second)
 	for ctx.Err() == nil {
 		select {
 		case <-ctx.Done():
@@ -87,6 +89,11 @@ func (w *wsConn) sendLoop(ctx context.Context) error {
 			if !ok {
 				return io.EOF
 			}
+			if err := w.conn.WriteJSON(msg); err != nil {
+				return errors.Wrap(err, "write")
+			}
+		case <-t.C:
+			msg := wsMsg{Type: "ts", Time: time.Now().UnixNano() / 1000000}
 			if err := w.conn.WriteJSON(msg); err != nil {
 				return errors.Wrap(err, "write")
 			}

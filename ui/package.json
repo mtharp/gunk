@@ -42,7 +42,9 @@
     }
   },
   "semistandard": {
-      "envs": ["browser"]
+    "envs": [
+      "browser"
+    ]
   },
   "postcss": {
     "plugins": {

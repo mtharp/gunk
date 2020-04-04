@@ -135,11 +135,6 @@ export function attachRTC (video, sdpURL) {
   video.controls = true;
   video.autoplay = true;
   video.addEventListener('canplay', function () { video.play(); });
-  // attach tracks to a shared MediaStream.
-  // note that safari does not support srcObject, nor does the fallback work if it's placed here, so handle that case when tracks are added.
-  // setting srcObject here results in a smoother experience for other browsers.
-  const ms = new MediaStream();
-  video.srcObject = ms;
   const pc = new RTCPeerConnection({
     iceServers: [{
       urls: [
@@ -149,9 +144,12 @@ export function attachRTC (video, sdpURL) {
     }]
   });
   // as the RTC session sets up tracks, attach them to a media stream that will feed the player
+  const ms = new MediaStream();
   pc.addEventListener('track', function (ev) {
     ms.addTrack(ev.track);
-    if ('srcObject' in video === false) {
+    if ('srcObject' in video) {
+      video.srcObject = ms;
+    } else {
       video.src = URL.createObjectURL(ms);
     }
   });
