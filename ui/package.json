@@ -15,6 +15,7 @@
     "lodash": "^4.17.14",
     "vue": "^2.6.6",
     "vue-router": "^3.0.7",
+    "vue-slider-component": "^3.1.1",
     "vue-timeago": "^5.1.2"
   },
   "devDependencies": {

@@ -1,6 +1,7 @@
 <template>
   <div class="player-box">
     <hls-player
+      ref="hls"
       :channel="channel"
       v-if="ch.live && ($root.playerType == 'HLS' || !$root.playerType)"
     />

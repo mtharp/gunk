@@ -15,23 +15,30 @@ export function restoreVolume (video) {
   });
 }
 
-export function attachHLS (video, hlsURL) {
-  video.controls = true;
-  video.autoplay = true;
-  if (Hls.isSupported()) {
-    const hls = new Hls({
-      bitrateTest: false
-      // debug: true
-    });
-    hls.attachMedia(video);
-    hls.loadSource(hlsURL);
-    hls.on(Hls.Events.MEDIA_ATTACHED, function () { video.play(); });
-    return function () { hls.destroy(); };
-  } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-    video.src = hlsURL;
+export class HLSPlayer {
+  constructor (video, hlsURL) {
+    this.hls = null;
+    // video.controls = true;
+    video.autoplay = true;
+    if (Hls.isSupported()) {
+      this.hls = new Hls({
+        bitrateTest: false
+        // debug: true
+      });
+      this.hls.attachMedia(video);
+      this.hls.loadSource(hlsURL);
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = hlsURL;
+    }
     video.addEventListener('canplay', function () { video.play(); });
   }
-  return function () { };
+
+  destroy () {
+    if (this.hls !== null) {
+      this.hls.destroy();
+      this.hls = null;
+    }
+  }
 }
 
 export function attachRTCPlay (video, ws, channel) {

@@ -22,7 +22,7 @@ nav .btn-sm img {
 .home {
     padding-top: 1rem;
     background: #111;
-    min-height: calc(100vh - 56px);
+    min-height: calc(100vh - 48px);
 }
 
 .channel-card {
@@ -103,10 +103,11 @@ nav .btn-sm img {
 }
 
 .player-box {
-    width: 100%;
-    height: calc(100vh - 56px);
+    width: 100vw;
+    height: 100vh;
     background-color: black;
     position: relative;
+    overflow: hidden;
 }
 
 .player-thumb {
@@ -125,4 +126,90 @@ nav .btn-sm img {
 
 .col {
     background: white;
+}
+
+#app[data-hidenav="hidenav"] nav  {
+  position: absolute;
+  top: 0;
+  width: 100%;
+  opacity: 0;
+  transition: 0.5s;
+  pointer-events: none;
+}
+
+#app[data-hidenav="hidenav"] nav:hover, #app[data-shownav="show"] nav {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+.controls-region {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 2.3rem;
+  opacity: 0;
+  transition: 0.5s;
+  pointer-events: none;
+}
+.controls-region:hover, .controls-show {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+.controls {
+  background: #000d;
+  display: flex;
+  justify-content: space-between;
+}
+.controls button {
+  height: 1.8rem;
+  min-width: 1.6rem;
+  margin: 0.25rem;
+  padding: 0 0.15rem;
+  border: 0;
+  background: transparent;
+  color: white;
+}
+.controls button:hover {
+  border-radius: 0.3rem;
+  background: #fff2;
+}
+.controls button:focus:active {
+  outline: 0;
+}
+
+.controls .dropdown-menu {
+  min-width: 12rem;
+}
+.controls .dropdown button {
+  font-size: 0.75rem;
+}
+.controls .dropdown img {
+  margin-left: -2px;
+  width: 20px;
+  height: 20px;
+}
+
+.big-button svg {
+  font-size: 1.5rem;
+}
+.live-button svg {
+  font-size: 1rem;
+}
+.latency {
+  padding: 0.5rem;
+  font-size: 0.85rem;
+  color: #888;
+}
+.mute-and-vol .volume {
+  opacity: 0;
+  transition: 0.25s;
+}
+.mute-and-vol:hover .volume, .mute-and-vol *:focus ~ .volume {
+  opacity: 1;
+}
+.volume {
+    margin-left: 0.5rem;
+    width: 100px;
+    padding-top: 0.5rem;
 }
