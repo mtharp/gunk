@@ -1,43 +1,147 @@
 import Hls from 'hls.js/dist/hls.js';
 import Axios from 'axios';
 
-export function restoreVolume (video) {
-  const vol = localStorage.getItem('volume');
-  if (vol) {
-    video.volume = vol / 100;
-  }
-  if (localStorage.getItem('unmute') === 'true') {
+// play video when ready and restore and save volume
+function autoplay (video) {
+  video.onvolumechange = null;
+  video.muted = true;
+  let forcedMute = false;
+  video.onplay = function () {
+    // update saved volume once playing, after we're done testing whether we can unmute
+    video.onvolumechange = () => {
+      localStorage.setItem('unmute', !video.muted);
+      localStorage.setItem('volume', Math.round(video.volume * 100));
+    };
+    if (!forcedMute) {
+      video.onclick = null;
+    }
+    forcedMute = false;
+  };
+  video.onclick = function () {
+    // unmute and play on first click, if autoplay failed
     video.muted = false;
-  }
-  video.addEventListener('volumechange', function () {
-    localStorage.setItem('unmute', !this.muted);
-    localStorage.setItem('volume', Math.round(this.volume * 100));
-  });
+    video.play();
+  };
+  video.onpause = function () {
+    // just play on subsequent clicks when paused
+    video.onclick = function () {
+      video.play();
+    };
+  };
+  video.oncanplay = function () {
+    // restore saved volume
+    const vol = localStorage.getItem('volume');
+    if (vol) {
+      video.volume = vol / 100;
+    }
+    if (localStorage.getItem('unmute') !== 'false') {
+      video.muted = false;
+    }
+    video.play()
+      .catch(() => {
+        // autoplay not allowed with sound, mute and try again
+        video.muted = true;
+        video.onclick = function () {
+          // unmute on click
+          video.muted = false;
+        };
+        forcedMute = true;
+        return video.play();
+      });
+  };
 }
 
 export class HLSPlayer {
   constructor (video, hlsURL) {
+    this.video = video;
     this.hls = null;
-    // video.controls = true;
-    video.autoplay = true;
+    // how far behind the latest feasible point to sit
+    this.targetBuffer = 1;
     if (Hls.isSupported()) {
       this.hls = new Hls({
-        bitrateTest: false
-        // debug: true
+        bitrateTest: false,
+        liveDurationInfinity: true,
+        liveBackBufferLength: 30
       });
       this.hls.attachMedia(video);
       this.hls.loadSource(hlsURL);
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = hlsURL;
     }
-    video.addEventListener('canplay', function () { video.play(); });
+    autoplay(video);
   }
 
   destroy () {
+    this.video = null;
     if (this.hls !== null) {
       this.hls.destroy();
       this.hls = null;
     }
+  }
+
+  details () {
+    if (!this.hls || !this.hls.levels) {
+      return null;
+    }
+    const lev = this.hls.levels[this.hls.currentLevel];
+    if (!lev) {
+      return null;
+    }
+    return lev.details;
+  }
+
+  seekLive () {
+    // seek to end and play
+    const details = this.details();
+    if (details === null || details.fragments.length < 3) {
+      this.video.play();
+      return;
+    }
+    for (let i = details.fragments.length - 1; i >= 0; i--) {
+      const f = details.fragments[i];
+      if (f.appendedPTS) {
+        // streaming this segment and chunks are ready to play
+        this.video.currentTime = f.appendedPTS - this.targetBuffer;
+        // console.log('s1', details.fragments.length - i, f);
+        return;
+      } else if (f.endPTS) {
+        // segment is fully processed, start from here
+        if ('appendedPTS' in f) {
+          // the next segment is streaming but hasn't appended yet, still we can start near the end of this one and hopefully it will be ready
+          // console.log('s2', details.fragments.length - i, f);
+          this.video.currentTime = f.endPTS - this.targetBuffer;
+        } else {
+          // must wait an additional segment length because the next one isn't streaming
+          // console.log('s3', details.fragments.length - i, f);
+          this.video.currentTime = f.start - this.targetBuffer;
+        }
+        return;
+      }
+    }
+  }
+
+  latencyTo (serverTime) {
+    // return how far behind the player is from the given server time, and whether it's close enough to live
+    const details = this.details();
+    if (serverTime === null || details === null || details.fragments.length < 2) {
+      return null;
+    }
+    let targetDuration = details.targetduration;
+    if ('appendedPTS' in details.fragments[0]) {
+      // LHLS, can play segments that are still downloading
+      targetDuration = 0;
+    }
+    const maxLatency = 5 * this.targetBuffer + 2 * targetDuration;
+    for (let i = details.fragments.length - 2; i >= 0; i--) {
+      const f = details.fragments[i];
+      if (f.programDateTime && !f.prefetch) {
+        const deltaDTS = this.video.currentTime - f.start;
+        const deltaDate = serverTime - f.programDateTime;
+        const latency = deltaDate / 1000 - deltaDTS;
+        return [latency, latency < maxLatency];
+      }
+    }
+    return null;
   }
 }
 

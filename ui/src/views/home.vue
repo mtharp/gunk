@@ -1,17 +1,23 @@
 <template>
   <div class="home">
-    <div
-      v-for="ch in $root.channels" :key="ch.name"
-      class="channel-card"
-      >
-      <router-link :to="$root.navChannel(ch.name)">
-        <img :src="ch.thumb" />
-        <div v-if="!ch.live" class="channel-shade">OFFLINE</div>
+    <div v-for="name in $root.recentChannels" :key="name" class="channel-card">
+      <router-link :to="$root.navChannel(name)">
+        <img :src="$root.channels[name].thumb" />
+        <div v-if="!$root.channels[name].live" class="channel-shade">OFFLINE</div>
         <div class="channel-card-title">
-          <h1>{{ch.name}}</h1>
+          <h1>{{name}}</h1>
           <div class="channel-status">
-            <span v-if="ch.live" class="channel-live">LIVE <img src="/eye-solid.svg"> {{ch.viewers}} </span>
-            <timeago v-if="!ch.live" class="channel-notlive" :datetime="ch.last" :auto-update="60" />
+            <span v-if="$root.channels[name].live" class="channel-live">
+              LIVE
+              <img src="/eye-solid.svg" />
+              {{$root.channels[name].viewers}}
+            </span>
+            <timeago
+              v-if="!$root.channels[name].live"
+              class="channel-notlive"
+              :datetime="$root.channels[name].last"
+              :auto-update="60"
+            />
           </div>
         </div>
       </router-link>
@@ -21,6 +27,6 @@
 
 <script>
 export default {
-  name: 'home',
-}
+  name: "home"
+};
 </script>

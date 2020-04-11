@@ -1,6 +1,6 @@
 <template>
   <div id="app">
-    <b-navbar toggleable="lg" type="dark" ref="nav">
+    <b-navbar toggleable="lg" type="dark" ref="nav" :class="$root.hiddenControlClasses">
       <b-navbar-brand to="/">
         <img src="/cheese.png" width="58" height="40" alt="cheese" />
         gunk
@@ -18,16 +18,6 @@
           >{{name}}</b-nav-item>
         </b-navbar-nav>
         <b-navbar-nav class="ml-auto">
-          <b-nav-text v-if="$route.name == 'watch'">
-            <b-button size="sm" class="mr-3" @click="$root.showStreamInfo = true">Info</b-button>
-            <b-button size="sm" class="mr-3" @click="$root.popVLC()">
-              <img src="/vlc.png" />VLC
-            </b-button>
-            <b-form-radio-group buttons size="sm" class="mr-3" v-model="$root.playerType">
-              <b-form-radio value="HLS">HLS</b-form-radio>
-              <b-form-radio value="RTC">RTC</b-form-radio>
-            </b-form-radio-group>
-          </b-nav-text>
           <b-nav-form v-if="!$root.loggedIn">
             <b-button size="sm" class="mr-2" @click.prevent="$root.doLogin">Login</b-button>
           </b-nav-form>

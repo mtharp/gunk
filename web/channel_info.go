@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"eaglesong.dev/gunk/model"
 	"github.com/gorilla/mux"
@@ -39,8 +40,20 @@ func (s *Server) viewChannelInfo(rw http.ResponseWriter, req *http.Request) {
 		log.Printf("error: listing channels: %s", err)
 		http.Error(rw, "", 500)
 	}
+	ret := struct {
+		Time     int64                         `json:"time"`
+		Channels map[string]*model.ChannelInfo `json:"channels"`
+		Recent   []string                      `json:"recent"`
+	}{
+		Time:     time.Now().UnixNano() / 1000000,
+		Channels: make(map[string]*model.ChannelInfo),
+	}
+	for _, info := range infos {
+		ret.Channels[info.Name] = info
+		ret.Recent = append(ret.Recent, info.Name)
+	}
 	rw.Header().Set("Access-Control-Allow-Origin", "*")
-	writeJSON(rw, infos)
+	writeJSON(rw, ret)
 }
 
 func (s *Server) viewThumb(rw http.ResponseWriter, req *http.Request) {

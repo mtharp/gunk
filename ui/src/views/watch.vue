@@ -1,50 +1,47 @@
 <template>
   <div class="player-box">
-    <hls-player
-      ref="hls"
-      :channel="channel"
-      v-if="ch.live && ($root.playerType == 'HLS' || !$root.playerType)"
+    <player
+      v-if="chInfo.live && !useRTC"
+      :poster="chInfo.thumb"
+      :hlsURL="hlsURL"
+      :liveURL="liveURL"
     />
-    <rtc-player :channel="channel" v-if="ch.live && $root.playerType == 'RTC'" />
-    <img v-if="!ch.live" :src="ch.thumb" class="player-thumb" />
-    <div v-if="!ch.live" class="player-shade">OFFLINE</div>
-    <b-modal v-model="$root.showStreamInfo" title="Stream Info" ok-only>
-      <p>Live URL (for VLC)</p>
-      <p>
-        <strong>{{liveURL}}</strong>
-      </p>
-    </b-modal>
+    <player
+      v-if="chInfo.live && useRTC"
+      :poster="chInfo.thumb"
+      :sdpURL="sdpURL"
+      :liveURL="liveURL"
+    />
+    <img v-if="!chInfo.live && chInfo.thumb" :src="chInfo.thumb" class="player-thumb" />
+    <div v-if="!chInfo.live" class="player-shade">OFFLINE</div>
   </div>
 </template>
 
 <script>
-import HLSPlayer from "../components/hlsplayer.vue";
-import RTCPlayer from "../components/rtcplayer.vue";
+import Player from "../components/player";
 
 export default {
-  name: "watch",
+  name: "hls-player",
   props: ["channel"],
-  components: {
-    "hls-player": HLSPlayer,
-    "rtc-player": RTCPlayer
+  components: { Player },
+  data() {
+    return {
+      useRTC: false,
+      liveURL: "/live/" + encodeURIComponent(this.channel) + ".m3u8",
+      hlsURL: "/hls/" + encodeURIComponent(this.channel) + "/index.m3u8",
+      sdpURL: "/sdp/" + encodeURIComponent(this.channel)
+    };
   },
   computed: {
-    ch() {
-      for (let ch of Object.values(this.$root.channels)) {
-        if (ch.name == this.channel) {
-          return ch;
-        }
+    chInfo() {
+      const ch = this.$root.channels[this.channel];
+      if (ch) {
+        return ch;
       }
-      return {};
-    },
-    liveURL() {
-      let u = this.ch.live_url;
-      if (!u) {
-        return "";
-      } else if (u[0] == "/") {
-        return this.baseURL + u;
-      }
-      return u;
+      return {
+        live: false,
+        thumb: null
+      };
     }
   }
 };
