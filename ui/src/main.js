@@ -24,6 +24,7 @@ new Vue({
       channels: {},
       recentChannels: [],
       serverTimeBase: null,
+      rtcSelected: localStorage.getItem('playerType') === 'RTC',
       user: {
         id: null,
         username: null,
@@ -75,6 +76,11 @@ new Vue({
         }
       }
       return live.sort();
+    }
+  },
+  watch: {
+    rtcSelected (rtcSelected) {
+      localStorage.setItem('playerType', rtcSelected ? 'RTC' : 'HLS');
     }
   },
   mounted () {

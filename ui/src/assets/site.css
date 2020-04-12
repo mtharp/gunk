@@ -119,7 +119,7 @@ nav .btn-sm img {
 .hidden-control {
   position: absolute !important;
   opacity: 0;
-  transition: 0.5s;
+  transition: opacity 0.5s;
   pointer-events: none;
 }
 .show-control, .hidden-control:hover {
@@ -139,8 +139,6 @@ nav .btn-sm img {
 .controls button {
   height: 1.8rem;
   min-width: 1.6rem;
-  margin: 0.25rem;
-  padding: 0 0.15rem;
   border: 0;
   background: transparent;
   color: white;
@@ -162,22 +160,22 @@ nav .btn-sm img {
   height: 20px;
 }
 
+.big-button {
+  padding-top: 0.15rem;
+}
 .big-button svg {
   font-size: 1.5rem;
 }
 .live-button svg {
   font-size: 1rem;
 }
-.live-button small {
-  vertical-align: top;
-}
-.latency {
-  padding: 0.5rem;
+.controls-latency {
   font-size: 0.85rem;
   color: #888;
 }
-.rtc-label {
-  padding: 0.3rem;
+.controls-viewers {
+  margin: 0 0.5rem;
+  color: #b00;
 }
 .mute-and-vol .volume {
   opacity: 0;
@@ -189,5 +187,5 @@ nav .btn-sm img {
 .volume {
     margin-left: 0.5rem;
     width: 100px;
-    padding-top: 0.5rem;
+    /* padding-top: 0.5rem; */
 }

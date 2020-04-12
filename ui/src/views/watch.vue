@@ -4,18 +4,16 @@
     <player
       v-if="chInfo.live && !rtcActive"
       :key="'hls' + channel"
-      :poster="chInfo.thumb"
+      :ch="chInfo"
       :hlsURL="hlsURL"
       :liveURL="liveURL"
-      :rtcEnabled="chInfo.rtc"
     />
     <player
       v-if="chInfo.live && rtcActive"
       :key="'rtc'+channel"
-      :poster="chInfo.thumb"
+      :ch="chInfo"
       :sdpURL="sdpURL"
       :liveURL="liveURL"
-      :rtcEnabled="chInfo.rtc"
     />
     <img v-if="!chInfo.live && chInfo.thumb" :src="chInfo.thumb" class="player-thumb" />
     <div v-if="!chInfo.live" class="player-shade">OFFLINE</div>
@@ -29,9 +27,6 @@ export default {
   name: "watch",
   props: ["channel"],
   components: { Player },
-  data() {
-    return { rtcSelected: false };
-  },
   computed: {
     chInfo() {
       const ch = this.$root.channels[this.channel];
@@ -41,7 +36,8 @@ export default {
       return {
         live: false,
         rtc: false,
-        thumb: null
+        thumb: null,
+        viewers: 0
       };
     },
     liveURL() {
@@ -54,7 +50,7 @@ export default {
       return "/sdp/" + encodeURIComponent(this.channel);
     },
     rtcActive() {
-      return this.rtcSelected && this.chInfo.rtc;
+      return this.$root.rtcSelected && this.chInfo.rtc;
     }
   }
 };
