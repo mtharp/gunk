@@ -53,6 +53,7 @@ function autoplay (video) {
 
 export class HLSPlayer {
   constructor (video, hlsURL) {
+    autoplay(video);
     this.video = video;
     this.hls = null;
     // how far behind the latest feasible point to sit
@@ -68,7 +69,6 @@ export class HLSPlayer {
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = hlsURL;
     }
-    autoplay(video);
   }
 
   destroy () {
@@ -242,6 +242,61 @@ export function attachRTCOffer (video, ws, channel) {
   };
 }
 
+export class RTCPlayer {
+  constructor (video, sdpURL) {
+    autoplay(video);
+    this.pc = new RTCPeerConnection({
+      iceServers: [{
+        urls: [
+          'stun:stun1.l.google.com:19302',
+          'stun:stun2.l.google.com:19302'
+        ]
+      }]
+    });
+    // as the RTC session sets up tracks, attach them to a media stream that will feed the player
+    const ms = new MediaStream();
+    this.pc.ontrack = function (ev) {
+      ms.addTrack(ev.track);
+      if ('srcObject' in video) {
+        video.srcObject = ms;
+      } else {
+        video.src = URL.createObjectURL(ms);
+      }
+    };
+    this.pc.onicecandidate = (ev) => {
+      if (ev.candidate !== null) {
+        // still gathering candidates
+        return;
+      }
+      // full set of candidates is done, send the offer
+      Axios.post(sdpURL, this.pc.localDescription)
+        .then(d => this.pc.setRemoteDescription(new RTCSessionDescription(d.data)));
+    };
+    // offer to receive
+    let offerArgs = {};
+    try {
+      this.pc.addTransceiver('audio', { direction: 'recvonly' });
+      this.pc.addTransceiver('video', { direction: 'recvonly' });
+    } catch (error) {
+      // backwards compat
+      offerArgs = { offerToReceiveVideo: true, offerToReceiveAudio: true };
+    }
+    this.pc.createOffer(offerArgs).then(d => this.pc.setLocalDescription(d));
+    // icecandidate gets called a bunch and then eventually with null, at which point the offer will be sent
+  }
+
+  destroy () {
+    this.pc.close();
+  }
+
+  seekLive () {
+    // rtc is always live
+  }
+
+  latencyTo () {
+    return [0, true];
+  }
+}
 export function attachRTC (video, sdpURL) {
   video.controls = true;
   video.autoplay = true;

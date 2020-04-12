@@ -1,16 +1,21 @@
 <template>
   <div class="player-box">
+    <!-- ensure player gets re-rendered by using a key unique to channel and delivery type -->
     <player
-      v-if="chInfo.live && !useRTC"
+      v-if="chInfo.live && !rtcActive"
+      :key="'hls' + channel"
       :poster="chInfo.thumb"
       :hlsURL="hlsURL"
       :liveURL="liveURL"
+      :rtcEnabled="chInfo.rtc"
     />
     <player
-      v-if="chInfo.live && useRTC"
+      v-if="chInfo.live && rtcActive"
+      :key="'rtc'+channel"
       :poster="chInfo.thumb"
       :sdpURL="sdpURL"
       :liveURL="liveURL"
+      :rtcEnabled="chInfo.rtc"
     />
     <img v-if="!chInfo.live && chInfo.thumb" :src="chInfo.thumb" class="player-thumb" />
     <div v-if="!chInfo.live" class="player-shade">OFFLINE</div>
@@ -21,16 +26,11 @@
 import Player from "../components/player";
 
 export default {
-  name: "hls-player",
+  name: "watch",
   props: ["channel"],
   components: { Player },
   data() {
-    return {
-      useRTC: false,
-      liveURL: "/live/" + encodeURIComponent(this.channel) + ".m3u8",
-      hlsURL: "/hls/" + encodeURIComponent(this.channel) + "/index.m3u8",
-      sdpURL: "/sdp/" + encodeURIComponent(this.channel)
-    };
+    return { rtcSelected: false };
   },
   computed: {
     chInfo() {
@@ -40,8 +40,21 @@ export default {
       }
       return {
         live: false,
+        rtc: false,
         thumb: null
       };
+    },
+    liveURL() {
+      return "/live/" + encodeURIComponent(this.channel) + ".m3u8";
+    },
+    hlsURL() {
+      return "/hls/" + encodeURIComponent(this.channel) + "/index.m3u8";
+    },
+    sdpURL() {
+      return "/sdp/" + encodeURIComponent(this.channel);
+    },
+    rtcActive() {
+      return this.rtcSelected && this.chInfo.rtc;
     }
   }
 };

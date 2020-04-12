@@ -176,6 +176,9 @@ nav .btn-sm img {
   font-size: 0.85rem;
   color: #888;
 }
+.rtc-label {
+  padding: 0.3rem;
+}
 .mute-and-vol .volume {
   opacity: 0;
   transition: 0.25s;

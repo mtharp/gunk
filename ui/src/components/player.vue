@@ -3,7 +3,7 @@
     <video
       ref="video"
       class="w-100 h-100"
-      :poster="poster"
+      :poster="initPoster"
       @play="playing = true; volume = $refs.video.volume"
       @pause="playing = false"
       @ended="playing = false"
@@ -67,35 +67,45 @@
         </div>
         <div class="d-flex justify-content-end">
           <!-- latency and seek to live -->
+          <template v-if="!$parent.rtcActive">
+            <div
+              v-if="playing"
+              class="latency"
+              v-b-tooltip.hover
+              title="Current delay to live stream"
+            >
+              <b-icon-clock-history />
+              {{latency ? latency.toFixed(1) + 's' : '-'}}
+            </div>
+            <button
+              @click="seekLive"
+              v-show="atTail"
+              class="live-button text-primary"
+              v-b-tooltip.hover
+              title="Jump to the latest point in the stream"
+            >
+              <b-icon-lightning-fill />
+              <span>LIVE</span>
+            </button>
+            <button
+              @click="seekLive"
+              v-show="!atTail"
+              class="live-button text-secondary"
+              v-b-tooltip.hover
+              title="Jump to the latest point in the stream"
+            >
+              <b-icon-lightning />
+              <small>Skip to Live</small>
+            </button>
+          </template>
           <div
-            v-if="playing"
-            class="latency"
+            v-if="playing && $parent.rtcActive"
+            class="rtc-label text-success"
             v-b-tooltip.hover
-            title="Current delay to live stream"
+            title="Real-time stream has near-zero latency"
           >
-            <b-icon-clock-history />
-            {{latency ? latency.toFixed(1) + 's' : '-'}}
+            <b-icon-soundwave />WebRTC
           </div>
-          <button
-            @click="seekLive"
-            v-show="atTail"
-            class="live-button text-primary"
-            v-b-tooltip.hover
-            title="Jump to the latest point in the stream"
-          >
-            <b-icon-lightning-fill />
-            <span>LIVE</span>
-          </button>
-          <button
-            @click="seekLive"
-            v-show="!atTail"
-            class="live-button text-secondary"
-            v-b-tooltip.hover
-            title="Jump to the latest point in the stream"
-          >
-            <b-icon-lightning />
-            <small>Skip to Live</small>
-          </button>
           <!-- settings menu -->
           <b-dropdown dropup right no-caret>
             <template v-slot:button-content>
@@ -106,7 +116,7 @@
               Watch in VLC
             </b-dropdown-item>
             <b-dropdown-form>
-              <b-form-checkbox v-model="$parent.useRTC">Use WebRTC</b-form-checkbox>
+              <b-form-checkbox v-model="$parent.rtcSelected" :disabled="!rtcEnabled">Use WebRTC</b-form-checkbox>
             </b-dropdown-form>
           </b-dropdown>
           <!-- fullscreen -->
@@ -129,34 +139,36 @@
 import VueSlider from "vue-slider-component";
 import "vue-slider-component/theme/default.css";
 import {
-  BIconPlayFill,
-  BIconPauseFill,
-  BIconLightning,
-  BIconLightningFill,
   BIconClockHistory,
   BIconFullscreen,
   BIconFullscreenExit,
+  BIconGearFill,
+  BIconLightning,
+  BIconLightningFill,
+  BIconPauseFill,
+  BIconPlayFill,
+  BIconSoundwave,
   BIconVolumeMuteFill,
-  BIconVolumeUpFill,
-  BIconGearFill
+  BIconVolumeUpFill
 } from "bootstrap-vue";
 
-import { HLSPlayer } from "../player.js";
+import { HLSPlayer, RTCPlayer } from "../player.js";
 
 export default {
   name: "player",
-  props: ["poster", "liveURL", "hlsURL", "sdpURL"],
+  props: ["poster", "liveURL", "hlsURL", "sdpURL", "rtcEnabled"],
   components: {
-    BIconPlayFill,
-    BIconPauseFill,
-    BIconLightning,
-    BIconLightningFill,
     BIconClockHistory,
     BIconFullscreen,
     BIconFullscreenExit,
+    BIconGearFill,
+    BIconLightning,
+    BIconLightningFill,
+    BIconPauseFill,
+    BIconPlayFill,
+    BIconSoundwave,
     BIconVolumeMuteFill,
     BIconVolumeUpFill,
-    BIconGearFill,
     VueSlider
   },
   data() {
@@ -164,6 +176,7 @@ export default {
       hasFullscreen: document.fullscreenEnabled,
       isFullscreen: document.fullscreenElement !== null,
       playing: false,
+      initPoster: this.poster,
       muted: true,
       volume: 0,
 
@@ -181,6 +194,9 @@ export default {
     if (this.hlsURL) {
       this.player = new HLSPlayer(video, this.hlsURL);
       this.latencytimer = window.setInterval(this.updateLatency, 1000);
+    } else if (this.sdpURL) {
+      this.player = new RTCPlayer(video, this.sdpURL);
+      this.atTail = true;
     }
   },
   beforeDestroy() {
@@ -207,7 +223,7 @@ export default {
     seekLive() {
       if (this.hlsURL && this.player !== null) {
         this.player.seekLive();
-      } else {
+      } else if (!this.playing) {
         this.$refs.video.play();
       }
     },
