@@ -1,5 +1,5 @@
 <template>
-  <div id="app">
+  <div id="app" :class="{'is-tabbing': $root.isTabbing}">
     <b-navbar toggleable="lg" type="dark" ref="nav" :class="$root.hiddenControlClasses">
       <b-navbar-brand to="/">
         <img src="/cheese.png" width="58" height="40" alt="cheese" />
@@ -38,3 +38,26 @@
     <router-view />
   </div>
 </template>
+
+<style>
+nav {
+  background-color: #043;
+  width: 100%;
+  height: 48px;
+  z-index: 1;
+  top: 0;
+}
+nav .show,
+nav .collapsing {
+  background-color: #002218;
+  padding: 1rem;
+}
+nav .btn-sm img {
+  height: 1rem;
+  width: 1rem;
+  margin-right: 0.25rem;
+}
+.navbar-brand img {
+  margin-right: 0.5rem;
+}
+</style>

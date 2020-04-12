@@ -3,7 +3,6 @@ import App from './app.vue';
 import router from './router';
 import ControlsHider from './components/controls-hider.vue';
 import axios from 'axios';
-import './assets/site.css';
 
 import 'bootstrap/dist/css/bootstrap.css';
 import 'bootstrap-vue/dist/bootstrap-vue.css';

@@ -16,7 +16,7 @@
         <button
           @click="$refs.video.play()"
           class="big-button"
-          v-show="!playing"
+          v-if="!playing"
           v-b-tooltip.hover
           title="Play"
         >
@@ -25,7 +25,7 @@
         <button
           @click="$refs.video.pause()"
           class="big-button"
-          v-show="playing"
+          v-else
           v-b-tooltip.hover
           title="Pause"
         >
@@ -36,7 +36,7 @@
           <button
             @click="$refs.video.muted = true"
             class="big-button"
-            v-show="!muted"
+            v-if="!muted"
             v-b-tooltip.hover
             title="Mute"
           >
@@ -45,7 +45,7 @@
           <button
             @click="$refs.video.muted = false"
             class="big-button"
-            v-show="muted"
+            v-else
             v-b-tooltip.hover
             title="Unmute"
           >
@@ -78,7 +78,7 @@
           </div>
           <button
             @click="seekLive"
-            v-show="atTail"
+            v-if="atTail"
             class="controls-live text-primary"
             v-b-tooltip.hover
             title="Jump to the latest point in the stream"
@@ -88,7 +88,7 @@
           </button>
           <button
             @click="seekLive"
-            v-show="!atTail"
+            v-else
             class="controls-live text-secondary"
             v-b-tooltip.hover
             title="Jump to the latest point in the stream"
@@ -250,3 +250,106 @@ export default {
   }
 };
 </script>
+
+<style>
+/* player */
+.player-box {
+  width: 100vw;
+  height: 100vh;
+  background-color: black;
+  position: relative;
+  overflow: hidden;
+}
+.player-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center center;
+}
+.player-shade {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #000c;
+  color: white;
+  overflow: hidden;
+
+  font-size: 10vh;
+  letter-spacing: 10vh;
+  text-align: center;
+  padding-top: 40vh;
+}
+/* controls */
+.controls {
+  background: #000d;
+  width: 100vw;
+  height: 2.3rem;
+  position: absolute;
+  bottom: 0;
+  display: flex;
+  justify-content: space-between;
+}
+.controls button {
+  height: 1.8rem;
+  min-width: 1.6rem;
+  border: 0;
+  background: transparent;
+  color: white;
+}
+.controls button:hover {
+  border-radius: 0.3rem;
+  background: #fff2;
+}
+.controls button:focus {
+  outline: none;
+}
+/* controls dropdown */
+.controls .dropdown-menu {
+  min-width: 12rem;
+}
+.controls .dropdown button {
+  font-size: 0.75rem;
+}
+.controls .dropdown img {
+  margin-left: -2px;
+  width: 20px;
+  height: 20px;
+}
+/* controls elements */
+.big-button {
+  padding-top: 0.15rem;
+}
+.big-button svg {
+  font-size: 1.5rem;
+}
+.controls-live {
+  margin: 0 0.5rem;
+}
+.controls-live svg {
+  font-size: 1rem;
+}
+.controls-latency {
+  font-size: 0.85rem;
+  color: #888;
+}
+.controls-viewers {
+  color: #b00;
+}
+.mute-and-vol .volume {
+  opacity: 0;
+  transition: 0.25s;
+}
+.mute-and-vol:hover .volume,
+.mute-and-vol *:focus ~ .volume,
+.is-tabbing .volume {
+  opacity: 1;
+}
+.volume {
+  margin-left: 0.5rem;
+  width: 100px;
+}
+</style>
