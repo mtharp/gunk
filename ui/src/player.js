@@ -62,7 +62,8 @@ export class HLSPlayer {
       this.hls = new Hls({
         bitrateTest: false,
         liveDurationInfinity: true,
-        liveBackBufferLength: 30
+        liveBackBufferLength: 30,
+        liveSyncDurationCount: 2,
       });
       this.hls.attachMedia(video);
       this.hls.loadSource(hlsURL);

@@ -117,7 +117,7 @@
           <template v-slot:button-content>
             <b-icon-gear-fill />
           </template>
-          <b-dropdown-item :href="liveURL">
+          <b-dropdown-item :href="liveURL" @click="$refs.video.pause()">
             <img src="/vlc.png" />
             Watch in VLC
           </b-dropdown-item>
