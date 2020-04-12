@@ -18,7 +18,7 @@
           class="big-button"
           v-if="!playing"
           v-b-tooltip.hover
-          title="Play"
+          title="Play (k)"
         >
           <b-icon-play-fill />
         </button>
@@ -27,7 +27,7 @@
           class="big-button"
           v-else
           v-b-tooltip.hover
-          title="Pause"
+          title="Pause (k)"
         >
           <b-icon-pause-fill />
         </button>
@@ -38,7 +38,7 @@
             class="big-button"
             v-if="!muted"
             v-b-tooltip.hover
-            title="Mute"
+            title="Mute (m)"
           >
             <b-icon-volume-up-fill />
           </button>
@@ -47,11 +47,11 @@
             class="big-button"
             v-else
             v-b-tooltip.hover
-            title="Unmute"
+            title="Unmute (m)"
           >
             <b-icon-volume-mute-fill />
           </button>
-          <div class="volume h-100">
+          <div :class="volumeClasses">
             <vue-slider
               v-model="volume"
               drag-on-click
@@ -59,6 +59,8 @@
               :min="0"
               :max="1"
               :interval="0.01"
+              v-b-tooltip.hover
+              title="Volume (up/down)"
               @change="$refs.video.volume = volume; $refs.video.muted = false"
             />
           </div>
@@ -81,7 +83,7 @@
             v-if="atTail"
             class="controls-live text-primary"
             v-b-tooltip.hover
-            title="Jump to the latest point in the stream"
+            title="Jump to the latest point in the stream (j)"
           >
             <b-icon-lightning-fill />
             <span>LIVE</span>
@@ -91,7 +93,7 @@
             v-else
             class="controls-live text-secondary"
             v-b-tooltip.hover
-            title="Jump to the latest point in the stream"
+            title="Jump to the latest point in the stream (j)"
           >
             <b-icon-lightning />
             <small>Skip to Live</small>
@@ -128,7 +130,7 @@
           v-if="hasFullscreen"
           @click="toggleFullscreen"
           v-b-tooltip.hover
-          :title="isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'"
+          :title="isFullscreen ? 'Exit Fullscreen (f)' : 'Fullscreen (f)'"
         >
           <b-icon-fullscreen v-if="!isFullscreen" />
           <b-icon-fullscreen-exit v-if="isFullscreen" />
@@ -187,6 +189,8 @@ export default {
 
       latency: 0,
       latencyTimer: null,
+      keyTimer: null,
+      keyPressed: false,
       atTail: false
     };
   },
@@ -195,19 +199,25 @@ export default {
     this.$root.startHidingControls();
   },
   mounted() {
+    this.keyTimer = null;
+    document.addEventListener("keydown", this.onKey);
     let video = this.$refs.video;
     if (this.hlsURL) {
       this.player = new HLSPlayer(video, this.hlsURL);
-      this.latencytimer = window.setInterval(this.updateLatency, 1000);
+      this.latencyTimer = window.setInterval(this.updateLatency, 1000);
     } else if (this.sdpURL) {
       this.player = new RTCPlayer(video, this.sdpURL);
       this.atTail = true;
     }
   },
   beforeDestroy() {
+    document.removeEventListener("keydown", this.onKey);
     document.removeEventListener("fullscreenchange", this.onFullscreen);
-    if (this.latencytimer) {
-      window.clearInterval(this.latencytimer);
+    if (this.keyTimer) {
+      window.clearTimeout(this.keyTimer);
+    }
+    if (this.latencyTimer) {
+      window.clearInterval(this.latencyTimer);
     }
     this.$root.stopHidingControls();
     if (this.player) {
@@ -217,6 +227,9 @@ export default {
   computed: {
     classes() {
       return Object.assign({ controls: true }, this.$root.hiddenControlClasses);
+    },
+    volumeClasses() {
+      return { volume: true, "key-pressed": this.keyPressed };
     }
   },
   methods: {
@@ -228,6 +241,54 @@ export default {
         document.exitFullscreen();
       } else {
         this.$el.requestFullscreen();
+      }
+    },
+    onKey(ev) {
+      this.$root.controlsTouched();
+      this.keyPressed = true;
+      if (this.keyTimer) {
+        window.clearTimeout(this.keyTimer);
+      }
+      this.keyTimer = window.setTimeout(() => {
+        this.keyPressed = false;
+        this.keyTimer = null;
+      }, 3000);
+      switch (ev.key) {
+        case "f":
+          this.toggleFullscreen();
+          break;
+        case "k":
+          if (this.playing) {
+            this.$refs.video.pause();
+          } else {
+            this.$refs.video.play();
+          }
+          break;
+        case "j":
+          this.seekLive();
+          break;
+        case "m":
+          this.muted = !this.muted;
+          this.$refs.video.muted = this.muted;
+          break;
+        case "ArrowDown":
+          if (this.volume > 0.05) {
+            this.volume -= 0.05;
+          } else {
+            this.volume = 0;
+          }
+          this.$refs.video.volume = this.volume;
+          this.$refs.video.muted = false;
+          break;
+        case "ArrowUp":
+          if (this.volume < 0.95) {
+            this.volume += 0.05;
+          } else {
+            this.volume = 1;
+          }
+          this.$refs.video.volume = this.volume;
+          this.$refs.video.muted = false;
+          break;
       }
     },
     seekLive() {
@@ -342,10 +403,12 @@ export default {
 .mute-and-vol .volume {
   opacity: 0;
   transition: 0.25s;
+  height: 100%;
 }
 .mute-and-vol:hover .volume,
 .mute-and-vol *:focus ~ .volume,
-.is-tabbing .volume {
+.is-tabbing .volume,
+.volume.key-pressed {
   opacity: 1;
 }
 .volume {

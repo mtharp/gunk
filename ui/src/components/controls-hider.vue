@@ -78,6 +78,8 @@ export default {
         case "Escape":
           this.isTabbing = false;
           break;
+        default:
+          this.controlsTouched();
       }
     }
   },
