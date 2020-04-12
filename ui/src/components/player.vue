@@ -196,7 +196,7 @@ export default {
   },
   created() {
     document.addEventListener("fullscreenchange", this.onFullscreen);
-    this.$root.startHidingControls();
+    this.$root.startHidingControls(this.$vnode.key);
   },
   mounted() {
     this.keyTimer = null;
@@ -219,7 +219,7 @@ export default {
     if (this.latencyTimer) {
       window.clearInterval(this.latencyTimer);
     }
-    this.$root.stopHidingControls();
+    this.$root.stopHidingControls(this.$vnode.key);
     if (this.player) {
       this.player.destroy();
     }
@@ -318,7 +318,8 @@ export default {
   width: 100vw;
   height: 100vh;
   background-color: black;
-  position: relative;
+  position: absolute;
+  top: 0;
   overflow: hidden;
 }
 .player-thumb {

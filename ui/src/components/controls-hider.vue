@@ -4,7 +4,7 @@ export default {
   data() {
     return {
       mouseMoving: null,
-      hidingControls: 0,
+      hidingControls: null,
       isTabbing: false
     };
   },
@@ -33,11 +33,13 @@ export default {
         this.mouseTimer = window.setInterval(this.mouseCheck, 500);
       }
     },
-    startHidingControls() {
-      this.hidingControls++;
+    startHidingControls(key) {
+      this.hidingControls = key;
     },
-    stopHidingControls() {
-      this.hidingControls--;
+    stopHidingControls(key) {
+      if (this.hidingControls === key) {
+        this.hidingControls = null;
+      }
     },
     // mouse events
     mouseMove(ev) {
