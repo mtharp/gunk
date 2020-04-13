@@ -122,11 +122,11 @@
             <img src="/vlc.png" />
             Watch in VLC
           </b-dropdown-item>
-          <b-dropdown-item :href="liveURL" @click.prevent="copyVLC">
+          <b-dropdown-item :href="ch.live_url" @click.prevent="copyVLC">
             <b-icon-clipboard-data />Copy VLC URL
           </b-dropdown-item>
           <b-dropdown-form v-if="showCopyVLC">
-            <b-form-input ref="copyVLCInput" :value="liveURL" readonly />
+            <b-form-input ref="copyVLCInput" :value="ch.live_url" readonly />
           </b-dropdown-form>
 
           <b-dropdown-form>
@@ -251,14 +251,6 @@ export default {
     },
     playlistURL() {
       return "/live/" + encodeURIComponent(this.ch.name) + ".m3u8";
-    },
-    liveURL() {
-      return (
-        window.location.origin +
-        "/live/" +
-        encodeURIComponent(this.ch.name) +
-        ".ts"
-      );
     }
   },
   methods: {
