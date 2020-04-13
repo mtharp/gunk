@@ -5,7 +5,7 @@
         <img :src="$root.channels[name].thumb" />
         <div v-if="!$root.channels[name].live" class="channel-shade">OFFLINE</div>
         <div class="channel-card-title">
-          <h1>{{name}}</h1>
+          <h1 :class="{'long-title': name.length > 20}">{{name}}</h1>
           <div class="channel-status">
             <span v-if="$root.channels[name].live" class="channel-live">
               LIVE
@@ -90,8 +90,13 @@ export default {
   font-size: 200%;
   position: absolute;
   bottom: 0;
-  width: 100%;
+  width: 290px;
+  max-height: 200px;
   overflow: hidden;
+}
+.channel-card-title h1.long-title {
+  font-size: 130%;
+  width: 390px;
 }
 .channel-status {
   position: absolute;

@@ -117,10 +117,18 @@
           <template v-slot:button-content>
             <b-icon-gear-fill />
           </template>
-          <b-dropdown-item :href="liveURL" @click="$refs.video.pause()">
+          <!-- for some reason chrome won't open a .m3u8 file directly so don't show the playlist link -->
+          <b-dropdown-item :href="playlistURL" @click="$refs.video.pause()" v-if="!isWebKit">
             <img src="/vlc.png" />
             Watch in VLC
           </b-dropdown-item>
+          <b-dropdown-item :href="liveURL" @click.prevent="copyVLC">
+            <b-icon-clipboard-data />Copy VLC URL
+          </b-dropdown-item>
+          <b-dropdown-form v-if="showCopyVLC">
+            <b-form-input ref="copyVLCInput" :value="liveURL" readonly />
+          </b-dropdown-form>
+
           <b-dropdown-form>
             <b-form-checkbox v-model="$root.rtcSelected" :disabled="!ch.rtc">Use WebRTC</b-form-checkbox>
           </b-dropdown-form>
@@ -144,6 +152,7 @@
 import VueSlider from "vue-slider-component";
 import "vue-slider-component/theme/default.css";
 import {
+  BIconClipboardData,
   BIconClockHistory,
   BIconEyeFill,
   BIconFullscreen,
@@ -162,8 +171,9 @@ import { HLSPlayer, RTCPlayer } from "../player.js";
 
 export default {
   name: "player",
-  props: ["ch", "liveURL", "hlsURL", "sdpURL", "rtcEnabled"],
+  props: ["ch", "rtcActive"],
   components: {
+    BIconClipboardData,
     BIconClockHistory,
     BIconEyeFill,
     BIconFullscreen,
@@ -182,6 +192,7 @@ export default {
     return {
       hasFullscreen: document.fullscreenEnabled,
       isFullscreen: document.fullscreenElement !== null,
+      isWebKit: navigator.userAgent.indexOf("WebKit") >= 0,
       playing: false,
       initPoster: this.ch.thumb,
       muted: true,
@@ -191,7 +202,8 @@ export default {
       latencyTimer: null,
       keyTimer: null,
       keyPressed: false,
-      atTail: false
+      atTail: false,
+      showCopyVLC: false
     };
   },
   created() {
@@ -202,12 +214,12 @@ export default {
     this.keyTimer = null;
     document.addEventListener("keydown", this.onKey);
     let video = this.$refs.video;
-    if (this.hlsURL) {
-      this.player = new HLSPlayer(video, this.hlsURL);
-      this.latencyTimer = window.setInterval(this.updateLatency, 1000);
-    } else if (this.sdpURL) {
+    if (this.rtcActive) {
       this.player = new RTCPlayer(video, this.sdpURL);
       this.atTail = true;
+    } else {
+      this.player = new HLSPlayer(video, this.hlsURL);
+      this.latencyTimer = window.setInterval(this.updateLatency, 1000);
     }
   },
   beforeDestroy() {
@@ -230,6 +242,23 @@ export default {
     },
     volumeClasses() {
       return { volume: true, "key-pressed": this.keyPressed };
+    },
+    hlsURL() {
+      return "/hls/" + encodeURIComponent(this.ch.name) + "/index.m3u8";
+    },
+    sdpURL() {
+      return "/sdp/" + encodeURIComponent(this.ch.name);
+    },
+    playlistURL() {
+      return "/live/" + encodeURIComponent(this.ch.name) + ".m3u8";
+    },
+    liveURL() {
+      return (
+        window.location.origin +
+        "/live/" +
+        encodeURIComponent(this.ch.name) +
+        ".ts"
+      );
     }
   },
   methods: {
@@ -307,6 +336,26 @@ export default {
       if (latency !== null) {
         [this.latency, this.atTail] = latency;
       }
+    },
+    // copy VLC URL to clipboard
+    copyVLC() {
+      this.showCopyVLC = true;
+      this.$nextTick(() => {
+        this.$refs.copyVLCInput.select();
+        document.execCommand("copy");
+        this.$nextTick(() => {
+          this.showCopyVLC = false;
+          this.$bvToast.toast(
+            "Open VLC, press Ctrl-N and paste to play the stream",
+            {
+              title: "Stream URL copied",
+              isStatus: true,
+              toaster: "b-toaster-bottom-right",
+              autoHideDelay: 2000
+            }
+          );
+        });
+      });
     }
   }
 };
@@ -376,10 +425,14 @@ export default {
 .controls .dropdown button {
   font-size: 0.75rem;
 }
-.controls .dropdown img {
+.controls .dropdown-item img {
   margin-left: -2px;
   width: 20px;
   height: 20px;
+}
+.controls .dropdown svg {
+  margin-left: -2px;
+  margin-right: 0.3rem;
 }
 /* controls elements */
 .big-button {
@@ -397,6 +450,9 @@ export default {
 .controls-latency {
   font-size: 0.85rem;
   color: #888;
+}
+.controls-rtclabel {
+  margin-right: 0.75rem;
 }
 .controls-viewers {
   color: #b00;
