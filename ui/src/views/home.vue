@@ -56,6 +56,9 @@ export default {
 .channel-card a:hover {
   text-decoration: none;
 }
+.channel-card a:focus {
+  outline: none;
+}
 .channel-card > img {
   width: 400px;
   min-height: 225px;
@@ -73,7 +76,6 @@ export default {
   color: white;
   overflow: hidden;
 
-  background-color: #000c;
   padding: 100px 30px;
   font-size: 32px;
   letter-spacing: 35px;
@@ -81,15 +83,21 @@ export default {
 .channel-card-title {
   position: relative;
   width: 100%;
+  height: 1.5rem;
 }
 .channel-card-title h1 {
   margin: 0 0 0 0.5rem;
   font-size: 200%;
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  overflow: hidden;
 }
 .channel-status {
   position: absolute;
   right: 0.2rem;
   bottom: 0;
+  background-color: #000c;
 }
 .channel-live {
   font-weight: bold;

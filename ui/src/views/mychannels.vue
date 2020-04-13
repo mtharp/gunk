@@ -36,6 +36,7 @@
       <div>
         <strong>Recommended OBS settings (stream tab) for NVENC:</strong>
         <ul>
+          <li>Output Mode: Advanced</li>
           <li>Keyframe Interval: 1 second</li>
           <li>Preset: Low-Latency Quality</li>
           <li>Profile: high</li>
@@ -43,12 +44,13 @@
         </ul>
         <strong>Recommended OBS settings (stream tab) for x264:</strong>
         <ul>
+          <li>Output Mode: Advanced</li>
           <li>Keyframe Interval: 1 second</li>
           <li>Preset: veryfast</li>
           <li>Profile: high</li>
           <li>Tune: zerolatency</li>
           <li>x264 options: bframes=0</li>
-        </ul>Make sure B-frames are disabled (set to 0) otherwise WebRTC will jitter.
+        </ul>Make sure B-frames are disabled (set to 0) otherwise WebRTC will not be available.
       </div>
     </b-modal>
   </div>

@@ -60,4 +60,7 @@ nav .btn-sm img {
 .navbar-brand img {
   margin-right: 0.5rem;
 }
+nav *:focus {
+  outline: none;
+}
 </style>
