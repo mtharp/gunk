@@ -30,7 +30,7 @@ func (s *Server) handlePublish(conn *rtmp.Conn) {
 	remote := conn.NetConn().RemoteAddr().(*net.TCPAddr).IP.String()
 	fm := &pktque.FilterDemuxer{
 		Demuxer: conn,
-		Filter:  &pktque.FixTime{MakeIncrement: true},
+		Filter:  &DeJitter{},
 	}
 	auth, err := s.CheckUser(conn.URL)
 	if err != nil {

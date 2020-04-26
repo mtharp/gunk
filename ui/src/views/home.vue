@@ -93,6 +93,7 @@ export default {
   width: 290px;
   max-height: 200px;
   overflow: hidden;
+  text-shadow: 2px 2px 2px black;
 }
 .channel-card-title h1.long-title {
   font-size: 130%;

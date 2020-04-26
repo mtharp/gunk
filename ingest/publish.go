@@ -81,7 +81,7 @@ func (m *Manager) Publish(auth model.ChannelAuth, kind, remote string, src av.De
 		return nil
 	})
 	// copy
-	eg.Go(func() error { return ch.copyStream(q, src) })
+	eg.Go(func() error { return ch.copyStream(ctx, q, src) })
 	return eg.Wait()
 }
 
@@ -107,6 +107,7 @@ func (ch *channel) setStream(q, aacq, opusq *pubsub.Queue, workDir string) *hls.
 	} else {
 		ch.hls = &hls.Publisher{
 			WorkDir: workDir,
+			FMP4:    true,
 			// Prefetch:  true,
 			// Precreate: 1,
 		}
@@ -129,9 +130,12 @@ func (ch *channel) stopStream(q *pubsub.Queue) {
 	ch.stoppedAt = time.Now()
 }
 
-func (ch *channel) copyStream(dest *pubsub.Queue, src av.Demuxer) error {
+func (ch *channel) copyStream(ctx context.Context, dest *pubsub.Queue, src av.Demuxer) error {
 	defer dest.Close()
 	for {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		pkt, err := src.ReadPacket()
 		if err == io.EOF {
 			return nil

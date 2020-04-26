@@ -234,6 +234,7 @@ export default {
     this.$root.stopHidingControls(this.$vnode.key);
     if (this.player) {
       this.player.destroy();
+      this.player = null;
     }
   },
   computed: {
@@ -313,11 +314,7 @@ export default {
       }
     },
     seekLive() {
-      if (this.hlsURL && this.player !== null) {
-        this.player.seekLive();
-      } else if (!this.playing) {
-        this.$refs.video.play();
-      }
+      this.player.seekLive();
     },
     updateLatency() {
       if (!this.playing) {
