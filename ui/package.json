@@ -12,7 +12,7 @@
     "bootstrap": "^4.3.1",
     "bootstrap-vue": "^2.0.0-rc.26",
     "hls.js": "^0.13.2",
-    "lodash": "^4.17.14",
+    "lodash": "^4.17.19",
     "vue": "^2.6.6",
     "vue-router": "^3.0.7",
     "vue-slider-component": "^3.1.1",
