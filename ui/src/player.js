@@ -1,4 +1,4 @@
-import Hls from 'hls.js/dist/hls.js';
+import { MediaPlayer, Debug } from 'dashjs';
 import Axios from 'axios';
 
 // play video when ready and restore and save volume
@@ -52,205 +52,78 @@ function autoplay (video) {
 }
 
 export class HLSPlayer {
-  constructor (video, hlsURL) {
+  constructor (video, webBase) {
     autoplay(video);
     this.video = video;
-    this.hls = null;
-    // how far behind the latest feasible point to sit
-    this.targetBuffer = 1;
-    if (Hls.isSupported()) {
-      this.hls = new Hls({
-        bitrateTest: false,
-        liveDurationInfinity: true,
-        liveBackBufferLength: 30,
-        liveSyncDurationCount: 2
-      });
-      this.hls.attachMedia(video);
-      this.hls.loadSource(hlsURL);
-    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = hlsURL;
-    }
+    this.stream = null;
+    this.stream = MediaPlayer().create();
+    this.stream.initialize();
+    this.stream.updateSettings({
+      streaming: {
+        // lowLatencyEnabled: true,
+        liveDelay: 1,
+        liveCatchUpMinDrift: 0.5,
+        liveCatchUpPlaybackRate: 0.05
+      },
+      debug: {
+        logLevel: Debug.LOG_LEVEL_DEBUG
+      }
+    });
+    // don't autoplay, the handler here will take care of it and this way the poster will be displayed in the meantime
+    this.stream.setAutoPlay(false);
+    this.stream.attachSource(webBase + '.mpd');
+    this.stream.attachView(video);
+    // if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    //   video.src = hlsURL;
+    // }
   }
 
   destroy () {
     this.video = null;
-    if (this.hls !== null) {
-      this.hls.destroy();
-      this.hls = null;
+    if (this.stream !== null) {
+      this.stream.reset();
+      this.stream = null;
     }
-  }
-
-  details () {
-    if (!this.hls || !this.hls.levels) {
-      return null;
-    }
-    const lev = this.hls.levels[this.hls.currentLevel];
-    if (!lev) {
-      return null;
-    }
-    return lev.details;
   }
 
   seekLive () {
+    this.video.play();
     // seek to end and play
-    const details = this.details();
-    if (details === null || details.fragments.length < 3) {
-      this.video.play();
-      return;
-    }
-    for (let i = details.fragments.length - 1; i >= 0; i--) {
-      const f = details.fragments[i];
-      if (f.appendedPTS) {
-        // streaming this segment and chunks are ready to play
-        this.video.currentTime = f.appendedPTS - this.targetBuffer;
-        // console.log('s1', details.fragments.length - i, f);
-        return;
-      } else if (f.endPTS) {
-        // segment is fully processed, start from here
-        if ('appendedPTS' in f) {
-          // the next segment is streaming but hasn't appended yet, still we can start near the end of this one and hopefully it will be ready
-          // console.log('s2', details.fragments.length - i, f);
-          this.video.currentTime = f.endPTS - this.targetBuffer;
-        } else {
-          // must wait an additional segment length because the next one isn't streaming
-          // console.log('s3', details.fragments.length - i, f);
-          this.video.currentTime = f.start - this.targetBuffer;
-        }
-        return;
-      }
-    }
+    // const details = this.details();
+    // if (details === null || details.fragments.length < 3) {
+    //   this.video.play();
+    //   return;
+    // }
+    // for (let i = details.fragments.length - 1; i >= 0; i--) {
+    //   const f = details.fragments[i];
+    //   if (f.appendedPTS) {
+    //     // streaming this segment and chunks are ready to play
+    //     this.video.currentTime = f.appendedPTS - this.targetBuffer;
+    //     // console.log('s1', details.fragments.length - i, f);
+    //     return;
+    //   } else if (f.endPTS) {
+    //     // segment is fully processed, start from here
+    //     if ('appendedPTS' in f) {
+    //       // the next segment is streaming but hasn't appended yet, still we can start near the end of this one and hopefully it will be ready
+    //       // console.log('s2', details.fragments.length - i, f);
+    //       this.video.currentTime = f.endPTS - this.targetBuffer;
+    //     } else {
+    //       // must wait an additional segment length because the next one isn't streaming
+    //       // console.log('s3', details.fragments.length - i, f);
+    //       this.video.currentTime = f.start - this.targetBuffer;
+    //     }
+    //     return;
+    // }
   }
 
-  latencyTo (serverTime) {
-    // return how far behind the player is from the given server time, and whether it's close enough to live
-    const details = this.details();
-    if (serverTime === null || details === null || details.fragments.length < 2) {
+  latencyTo () {
+    try {
+      return [this.stream.getCurrentLiveLatency(), true];
+    } catch (error) {
       return null;
     }
-    let targetDuration = details.targetduration;
-    if ('appendedPTS' in details.fragments[0]) {
-      // LHLS, can play segments that are still downloading
-      targetDuration = 0;
-    }
-    const maxLatency = 5 * this.targetBuffer + 2 * targetDuration;
-    for (let i = details.fragments.length - 2; i >= 0; i--) {
-      const f = details.fragments[i];
-      if (f.programDateTime && !f.prefetch) {
-        const deltaDTS = this.video.currentTime - f.start;
-        const deltaDate = serverTime - f.programDateTime;
-        const latency = deltaDate / 1000 - deltaDTS;
-        return [latency, latency < maxLatency];
-      }
-    }
-    return null;
   }
 }
-
-// export function attachRTCPlay (video, ws, channel) {
-//   video.controls = true;
-//   video.autoplay = true;
-//   video.addEventListener('canplay', function () { video.play(); });
-//   const ms = new MediaStream();
-//   if ('srcObject' in video) {
-//     video.srcObject = ms;
-//   } else {
-//     // backwards compat
-//     video.src = URL.createObjectURL(ms);
-//   }
-//   const pc = new RTCPeerConnection({
-//     iceServers: [{
-//       urls: [
-//         'stun:stun1.l.google.com:19302',
-//         'stun:stun2.l.google.com:19302'
-//       ]
-//     }]
-//   });
-//   // as the RTC session sets up tracks, attach them to a media stream that will feed the player
-//   pc.addEventListener('track', (ev) => ms.addTrack(ev.track));
-//   pc.addEventListener('icecandidate', (ev) => ws.candidate(ev.candidate));
-//   ws.onCandidate = (cand) => pc.addIceCandidate(cand);
-//   // ask for an offer
-//   // request an offer from the server
-//   ws.play(channel)
-//     .then((offer) => pc.setRemoteDescription(new RTCSessionDescription(offer)))
-//     .then(() => pc.createAnswer())
-//     .then((answer) => {
-//       ws.answer(answer);
-//       pc.setLocalDescription(answer);
-//     });
-//   return function () {
-//     ws.stop();
-//     pc.close();
-//   };
-// }
-
-// export class RTCPlayerWSOffer {
-//   constructor (video, channel) {
-//     this.ws = new WSSession(window.location);
-//     autoplay(video);
-//     const ms = new MediaStream();
-//     video.srcObject = ms;
-//     const pc = new RTCPeerConnection({
-//       iceServers: [{
-//         urls: [
-//           'stun:stun1.l.google.com:19302',
-//           'stun:stun2.l.google.com:19302'
-//         ]
-//       }]
-//     });
-//     // as the RTC session sets up tracks, attach them to a media stream that will feed the player
-//     pc.addEventListener('track', (ev) => ms.addTrack(ev.track));
-//     pc.addEventListener('icecandidate', (ev) => ws.candidate(ev.candidate));
-//     let savedCandidates = [];
-//     ws.onCandidate = (cand) => {
-//       if (savedCandidates === null) {
-//         console.log('applying', cand);
-//         pc.addIceCandidate(cand);
-//       } else {
-//         console.log('saving', cand);
-//         savedCandidates.push(cand);
-//       }
-//     };
-//     // offer to receive
-//     var offerArgs = {};
-//     try {
-//       pc.addTransceiver('audio', { direction: 'recvonly' });
-//       pc.addTransceiver('video', { direction: 'recvonly' });
-//     } catch (error) {
-//       // backwards compat
-//       offerArgs = { offerToReceiveVideo: true, offerToReceiveAudio: true };
-//     }
-//     pc.createOffer(offerArgs)
-//       .then(offer => {
-//         pc.setLocalDescription(offer);
-//         return ws.offer(channel, offer);
-//       }).then(answer => {
-//         pc.setRemoteDescription(new RTCSessionDescription(answer));
-//         for (const cand of savedCandidates) {
-//           console.log('applying deferred', cand);
-//           pc.addIceCandidate(cand);
-//         }
-//         savedCandidates = null;
-//       });
-//     return function () {
-//       ws.stop();
-//       pc.close();
-//     };
-//   }
-
-//   destroy () {
-//     this.pc.close();
-//     this.ws.close();
-//   }
-
-//   seekLive () {
-//     this.player.play();
-//   }
-
-//   latencyTo () {
-//     return [0, true];
-//   }
-// }
 
 export class RTCPlayer {
   constructor (video, sdpURL) {

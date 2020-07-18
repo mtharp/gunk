@@ -8,12 +8,12 @@ import (
 	"eaglesong.dev/gunk/ingest/ftl"
 	"eaglesong.dev/gunk/model"
 	"eaglesong.dev/gunk/sinks/grabber"
-	"eaglesong.dev/hls"
+	"eaglesong.dev/hls/dash"
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/av/pubsub"
 )
 
-const hlsViewTimeout = 16 * time.Second
+const webViewTimeout = 16 * time.Second
 
 type PublishEvent func(auth model.ChannelAuth, live bool, thumb grabber.Result)
 
@@ -34,13 +34,13 @@ type channel struct {
 	mu        sync.Mutex
 	ingest    *pubsub.Queue
 	aac, opus *pubsub.Queue
-	hls       *hls.Publisher
+	web       *dash.Publisher
 	stoppedAt time.Time
 
 	live, rtc uintptr
-	viewers   int32 // excluding hls
-	hlsv      sync.Map
-	hlsvTotal int32
+	viewers   int32 // excluding web
+	webv      sync.Map
+	webvTotal int32
 }
 
 func (m *Manager) channel(name string) *channel {
@@ -83,36 +83,36 @@ func (ch *channel) addViewer(delta int32) {
 	atomic.AddInt32(&ch.viewers, delta)
 }
 
-func (ch *channel) hlsViewed(host string) {
-	ch.hlsv.Store(host, time.Now())
+func (ch *channel) webViewed(host string) {
+	ch.webv.Store(host, time.Now())
 }
 
-func (ch *channel) countHLSViewers() {
+func (ch *channel) countWebViewers() {
 	var views int32
-	ch.hlsv.Range(func(key, value interface{}) bool {
+	ch.webv.Range(func(key, value interface{}) bool {
 		t := value.(time.Time)
-		if time.Since(t) > hlsViewTimeout {
-			ch.hlsv.Delete(key)
+		if time.Since(t) > webViewTimeout {
+			ch.webv.Delete(key)
 		} else {
 			views++
 		}
 		return true
 	})
-	atomic.StoreInt32(&ch.hlsvTotal, views)
+	atomic.StoreInt32(&ch.webvTotal, views)
 }
 
-func (ch *channel) getHLS() *hls.Publisher {
+func (ch *channel) getWeb() *dash.Publisher {
 	if ch == nil {
 		return nil
 	}
 	ch.mu.Lock()
-	p := ch.hls
+	p := ch.web
 	ch.mu.Unlock()
 	return p
 }
 
 func (ch *channel) currentViewers() int {
 	v := int(atomic.LoadInt32(&ch.viewers))
-	v += int(atomic.LoadInt32(&ch.hlsvTotal))
+	v += int(atomic.LoadInt32(&ch.webvTotal))
 	return v
 }

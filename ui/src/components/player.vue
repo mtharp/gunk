@@ -218,7 +218,7 @@ export default {
       this.player = new RTCPlayer(video, this.sdpURL);
       this.atTail = true;
     } else {
-      this.player = new HLSPlayer(video, this.hlsURL);
+      this.player = new HLSPlayer(video, this.webBase);
       this.latencyTimer = window.setInterval(this.updateLatency, 1000);
     }
   },
@@ -244,8 +244,13 @@ export default {
     volumeClasses() {
       return { volume: true, "key-pressed": this.keyPressed };
     },
-    hlsURL() {
-      return "/hls/" + encodeURIComponent(this.ch.name) + "/index.m3u8";
+    webBase() {
+      return (
+        "/hd/" +
+        encodeURIComponent(this.ch.name) +
+        "/" +
+        encodeURIComponent(this.ch.pub_id)
+      );
     },
     sdpURL() {
       return "/sdp/" + encodeURIComponent(this.ch.name);

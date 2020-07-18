@@ -34,6 +34,7 @@ type DeJitter struct {
 	lastA time.Duration
 }
 
+// find the nearest framerate matching a inter-frame gap and tweak the packet time to match
 func applyRate(pkt *av.Packet, gap, candidate time.Duration) bool {
 	delta := candidate - gap
 	if delta < -rateMatch || delta > rateMatch {
@@ -45,7 +46,27 @@ func applyRate(pkt *av.Packet, gap, candidate time.Duration) bool {
 		t += time.Second - remainder
 	}
 	pkt.Time = t
+	applyComposition(pkt, candidate)
 	return true
+}
+
+// round composition time to a multiple of the matched rate
+func applyComposition(pkt *av.Packet, rate time.Duration) {
+	t := pkt.CompositionTime
+	sign := time.Duration(1)
+	if t == 0 {
+		return
+	} else if t < 0 {
+		sign = -1
+		t *= -1
+	}
+	min, max := t-rateMatch, t+rateMatch
+	for cand := rate; cand < max; cand += rate {
+		if cand >= min {
+			pkt.CompositionTime = cand * sign
+			return
+		}
+	}
 }
 
 func (j *DeJitter) ModifyPacket(pkt *av.Packet, streams []av.CodecData, videoidx int, audioidx int) (drop bool, err error) {

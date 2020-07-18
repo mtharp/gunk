@@ -8,9 +8,9 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func (s *Server) viewPlayHLS(rw http.ResponseWriter, req *http.Request) {
+func (s *Server) viewPlayWeb(rw http.ResponseWriter, req *http.Request) {
 	chname := mux.Vars(req)["channel"]
-	err := s.Channels.ServeHLS(rw, req, chname)
+	err := s.Channels.ServeWeb(rw, req, chname)
 	if err == ingest.ErrNoChannel {
 		http.NotFound(rw, req)
 	} else if err != nil {

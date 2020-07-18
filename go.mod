@@ -1,8 +1,10 @@
 module eaglesong.dev/gunk
 
-go 1.13
+go 1.14
 
-replace github.com/nareix/joy4 => eaglesong.dev/joy4 v0.0.0-20190831160920-566887487cc0
+replace github.com/nareix/joy4 => ../joy4
+
+replace eaglesong.dev/hls => ../hls
 
 require (
 	eaglesong.dev/hls v1.1.1-0.20200426043048-f48cdd63f891

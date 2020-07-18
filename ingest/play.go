@@ -34,7 +34,7 @@ func (m *Manager) ServeTS(rw http.ResponseWriter, req *http.Request, name string
 	return copyStream(req.Context(), muxer, src)
 }
 
-func (m *Manager) ServeHLS(rw http.ResponseWriter, req *http.Request, name string) error {
+func (m *Manager) ServeWeb(rw http.ResponseWriter, req *http.Request, name string) error {
 	ch := m.channel(name)
 	if ch == nil {
 		return ErrNoChannel
@@ -44,9 +44,9 @@ func (m *Manager) ServeHLS(rw http.ResponseWriter, req *http.Request, name strin
 		host = req.RemoteAddr
 	}
 	if host != "" {
-		ch.hlsViewed(host)
+		ch.webViewed(host)
 	}
-	p := ch.getHLS()
+	p := ch.getWeb()
 	if p == nil {
 		return ErrNoChannel
 	}
@@ -107,6 +107,7 @@ func (m *Manager) PopulateLive(infos []*model.ChannelInfo) {
 		info.Live = ch.isLive()
 		info.Viewers = ch.currentViewers()
 		info.RTC = atomic.LoadUintptr(&ch.rtc) != 0
+		info.PubID = ch.getWeb().ID()
 	}
 }
 

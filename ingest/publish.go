@@ -10,14 +10,14 @@ import (
 	"eaglesong.dev/gunk/model"
 	"eaglesong.dev/gunk/sinks/grabber"
 	"eaglesong.dev/gunk/transcode/opus"
-	"eaglesong.dev/hls"
+	"eaglesong.dev/hls/dash"
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/av/pubsub"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
 
-const hlsExpiry = 60 * time.Second
+const webExpiry = 60 * time.Second
 
 func (m *Manager) Publish(auth model.ChannelAuth, kind, remote string, src av.Demuxer) error {
 	name := auth.Name
@@ -33,7 +33,7 @@ func (m *Manager) Publish(auth model.ChannelAuth, kind, remote string, src av.De
 		q.Close()
 	}()
 	// grab keyframes for thumbnail
-	grabch, err := grabber.Grab(name, q.Latest())
+	grabch, err := grabber.Grab(name, q.Oldest())
 	if err != nil {
 		return errors.Wrap(err, "setting up frame grabber")
 	}
@@ -63,12 +63,12 @@ func (m *Manager) Publish(auth model.ChannelAuth, kind, remote string, src av.De
 	}
 	// start outputs
 	eg.Go(func() error {
-		return errors.Wrap(ch.copyHLS(p, q.Latest()), "hls publish")
+		return errors.Wrap(ch.copyWeb(p, q.Oldest()), "web publish")
 	})
 	eg.Go(func() error {
 		// notify ws clients when thumbnail is updated
 		for thumb := range grabch {
-			ch.countHLSViewers()
+			ch.countWebViewers()
 			if m.PublishEvent != nil {
 				m.PublishEvent(auth, true, thumb)
 			}
@@ -92,7 +92,7 @@ func (m *Manager) Cleanup() {
 	})
 }
 
-func (ch *channel) setStream(q, aacq, opusq *pubsub.Queue, workDir string) *hls.Publisher {
+func (ch *channel) setStream(q, aacq, opusq *pubsub.Queue, workDir string) *dash.Publisher {
 	ch.mu.Lock()
 	defer ch.mu.Unlock()
 	if ch.ingest != nil {
@@ -101,20 +101,15 @@ func (ch *channel) setStream(q, aacq, opusq *pubsub.Queue, workDir string) *hls.
 	ch.ingest = q
 	ch.aac = aacq
 	ch.opus = opusq
-	if ch.hls != nil {
-		// stream restarted so viewer should reset their decoder
-		ch.hls.Discontinuity()
-	} else {
-		ch.hls = &hls.Publisher{
-			WorkDir: workDir,
-			FMP4:    true,
-			// Prefetch:  true,
-			// Precreate: 1,
-		}
+	if ch.web != nil {
+		ch.web.Close()
+	}
+	ch.web = &dash.Publisher{
+		WorkDir: workDir,
 	}
 	ch.stoppedAt = time.Time{}
 	atomic.StoreUintptr(&ch.live, 1)
-	return ch.hls
+	return ch.web
 }
 
 func (ch *channel) stopStream(q *pubsub.Queue) {
@@ -148,7 +143,7 @@ func (ch *channel) copyStream(ctx context.Context, dest *pubsub.Queue, src av.De
 	}
 }
 
-func (ch *channel) copyHLS(dest *hls.Publisher, src av.Demuxer) error {
+func (ch *channel) copyWeb(dest av.Muxer, src av.Demuxer) error {
 	var streams []av.CodecData
 	var err error
 	if streams, err = src.Streams(); err != nil {
@@ -164,11 +159,7 @@ func (ch *channel) copyHLS(dest *hls.Publisher, src av.Demuxer) error {
 		} else if err != nil {
 			return err
 		}
-		ep := hls.ExtendedPacket{Packet: pkt}
-		if pkt.IsKeyFrame {
-			ep.ProgramTime = time.Now()
-		}
-		if err := dest.WriteExtendedPacket(ep); err != nil {
+		if err := dest.WritePacket(pkt); err != nil {
 			return err
 		}
 	}
@@ -176,9 +167,9 @@ func (ch *channel) copyHLS(dest *hls.Publisher, src av.Demuxer) error {
 
 func (ch *channel) cleanup() {
 	ch.mu.Lock()
-	if ch.hls != nil && !ch.stoppedAt.IsZero() && time.Since(ch.stoppedAt) > hlsExpiry {
-		ch.hls.Close()
-		ch.hls = nil
+	if ch.web != nil && !ch.stoppedAt.IsZero() && time.Since(ch.stoppedAt) > webExpiry {
+		ch.web.Close()
+		ch.web = nil
 	}
 	ch.mu.Unlock()
 }
@@ -199,7 +190,7 @@ func convertOpus(eg *errgroup.Group, q *pubsub.Queue, bitrate int) *pubsub.Queue
 	ret := pubsub.NewQueue()
 	eg.Go(func() error {
 		defer ret.Close()
-		return errors.Wrap(opus.Convert(q.Latest(), ret, bitrate), "opus conversion")
+		return errors.Wrap(opus.Convert(q.Oldest(), ret, bitrate), "opus conversion")
 	})
 	return ret
 }
