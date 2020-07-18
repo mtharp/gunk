@@ -15,6 +15,12 @@ import (
 	"golang.org/x/oauth2"
 )
 
+const (
+	discordBase = "https://discord.com/api"
+	discordAPI  = discordBase + "/v6"
+	discordCDN  = "https://cdn.discordapp.com"
+)
+
 type discordUser struct {
 	ID            string `json:"id"`
 	Username      string `json:"username"`
@@ -44,13 +50,13 @@ func httpGet(ctx context.Context, cli *http.Client, uri string, body interface{}
 func (s *Server) lookupUser(ctx context.Context, token *oauth2.Token) (user discordUser, err error) {
 	tsrc := s.oauth.TokenSource(ctx, token)
 	cli := oauth2.NewClient(ctx, tsrc)
-	if err = httpGet(ctx, cli, "https://discordapp.com/api/users/@me", &user); err != nil {
+	if err = httpGet(ctx, cli, discordAPI+"/users/@me", &user); err != nil {
 		return
 	}
 	var guildList []struct {
 		ID string `json:"id"`
 	}
-	if err = httpGet(ctx, cli, "https://discordapp.com/api/users/@me/guilds", &guildList); err != nil {
+	if err = httpGet(ctx, cli, discordAPI+"/users/@me/guilds", &guildList); err != nil {
 		return
 	}
 	var announce bool
