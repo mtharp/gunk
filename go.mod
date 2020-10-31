@@ -7,21 +7,20 @@ replace github.com/nareix/joy4 => eaglesong.dev/joy4 v0.0.0-20190831160920-56688
 require (
 	eaglesong.dev/hls v1.1.0
 	github.com/cockroachdb/apd v1.1.0 // indirect
-	github.com/gofrs/uuid v3.2.0+incompatible // indirect
-	github.com/gorilla/mux v1.7.4
+	github.com/gofrs/uuid v3.3.0+incompatible // indirect
+	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/jackc/fake v0.0.0-20150926172116-812a484cc733 // indirect
 	github.com/jackc/pgx v3.6.2+incompatible
-	github.com/kr/pretty v0.2.0
-	github.com/lib/pq v1.3.0 // indirect
-	github.com/nareix/joy4 v0.0.0-20181022032202-3ddbc8f9d431
-	github.com/pion/rtp v1.4.0
-	github.com/pion/sdp/v2 v2.3.5
-	github.com/pion/webrtc/v2 v2.2.4
-	github.com/pkg/errors v0.9.1
-	github.com/shopspring/decimal v0.0.0-20200227202807-02e2044944cc // indirect
-	golang.org/x/crypto v0.0.0-20200323165209-0ec3e9974c59
-	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
-	golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a
+	github.com/kr/pretty v0.2.1
+	github.com/lib/pq v1.8.0 // indirect
+	github.com/nareix/joy4 v0.0.0-20200507095837-05a4ffbb5369
+	github.com/pion/rtp v1.6.1
+	github.com/pion/sdp/v2 v2.4.0
+	github.com/pion/webrtc/v2 v2.2.26
+	github.com/shopspring/decimal v1.2.0 // indirect
+	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
+	golang.org/x/oauth2 v0.0.0-20200902213428-5d25da1a8d43
+	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 	layeh.com/gopus v0.0.0-20161224163843-0ebf989153aa
 )

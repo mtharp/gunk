@@ -2,6 +2,7 @@ package ingest
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"sync/atomic"
@@ -13,7 +14,6 @@ import (
 	"eaglesong.dev/hls"
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/av/pubsub"
-	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -23,7 +23,7 @@ func (m *Manager) Publish(auth model.ChannelAuth, kind, remote string, src av.De
 	name := auth.Name
 	streams, err := src.Streams()
 	if err != nil {
-		return errors.Wrap(err, "reading streams")
+		return fmt.Errorf("reading streams: %w", err)
 	}
 	q := pubsub.NewQueue()
 	q.WriteHeader(streams)
@@ -35,7 +35,7 @@ func (m *Manager) Publish(auth model.ChannelAuth, kind, remote string, src av.De
 	// grab keyframes for thumbnail
 	grabch, err := grabber.Grab(name, q.Latest())
 	if err != nil {
-		return errors.Wrap(err, "setting up frame grabber")
+		return fmt.Errorf("setting up frame grabber: %w", err)
 	}
 	aacq := q
 	opusq := q
@@ -63,7 +63,11 @@ func (m *Manager) Publish(auth model.ChannelAuth, kind, remote string, src av.De
 	}
 	// start outputs
 	eg.Go(func() error {
-		return errors.Wrap(ch.copyHLS(p, q.Latest()), "hls publish")
+		err := ch.copyHLS(p, q.Latest())
+		if err != nil {
+			err = fmt.Errorf("hls publish: %w", err)
+		}
+		return err
 	})
 	eg.Go(func() error {
 		// notify ws clients when thumbnail is updated
@@ -195,7 +199,11 @@ func convertOpus(eg *errgroup.Group, q *pubsub.Queue, bitrate int) *pubsub.Queue
 	ret := pubsub.NewQueue()
 	eg.Go(func() error {
 		defer ret.Close()
-		return errors.Wrap(opus.Convert(q.Latest(), ret, bitrate), "opus conversion")
+		err := opus.Convert(q.Latest(), ret, bitrate)
+		if err != nil {
+			err = fmt.Errorf("opus conversion: %w", err)
+		}
+		return err
 	})
 	return ret
 }

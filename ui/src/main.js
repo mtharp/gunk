@@ -23,6 +23,7 @@ new Vue({
       channels: {},
       recentChannels: [],
       serverTimeBase: null,
+      hlsBase: '',
       rtcSelected: localStorage.getItem('playerType') === 'RTC',
       user: {
         id: null,
@@ -39,6 +40,7 @@ new Vue({
           this.channels = response.data.channels;
           this.recentChannels = response.data.recent;
           this.serverTimeBase = response.data.time - performance.now();
+          this.hlsBase = response.data.base_url;
         });
     },
     updateUser () {

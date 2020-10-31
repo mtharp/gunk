@@ -16,6 +16,7 @@ import (
 type Server struct {
 	Secure        bool     // set secure cookies
 	BaseURL       string   // base URL
+	HLSBase       string   // base URL for web playback
 	AdvertiseRTMP string   // base URL to advertise for RTMP ingest
 	AdvertiseLive *url.URL // base URL to advertise for direct HTTP streams
 
