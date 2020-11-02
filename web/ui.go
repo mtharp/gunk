@@ -36,7 +36,7 @@ func uiRoutes(r *mux.Router) {
 	r.NotFoundHandler = cacheImmutable(handler)
 
 	// proxy avatars to avoid being blocked by privacy tools
-	cdn, _ := url.Parse("https://cdn.discordapp.com")
+	cdn, _ := url.Parse(discordCDN)
 	avatars := httputil.NewSingleHostReverseProxy(cdn)
 	r.PathPrefix("/avatars").HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		req.Host = cdn.Host

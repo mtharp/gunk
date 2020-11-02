@@ -18,8 +18,8 @@ const (
 )
 
 var discordEndpoint = oauth2.Endpoint{
-	AuthURL:   "https://discordapp.com/api/oauth2/authorize",
-	TokenURL:  "https://discordapp.com/api/oauth2/token",
+	AuthURL:   discordBase + "/oauth2/authorize",
+	TokenURL:  discordBase + "/oauth2/token",
 	AuthStyle: oauth2.AuthStyleInHeader,
 }
 

@@ -4,7 +4,10 @@
       ref="video"
       class="w-100 h-100"
       :poster="initPoster"
-      @play="playing = true; volume = $refs.video.volume"
+      @play="
+        playing = true;
+        volume = $refs.video.volume;
+      "
       @pause="playing = false"
       @ended="playing = false"
       @volumechange="muted = $refs.video.muted"
@@ -61,7 +64,10 @@
               :interval="0.01"
               v-b-tooltip.hover
               title="Volume (up/down)"
-              @change="$refs.video.volume = volume; $refs.video.muted = false"
+              @change="
+                $refs.video.volume = volume;
+                $refs.video.muted = false;
+              "
             />
           </div>
         </div>
@@ -76,7 +82,7 @@
             title="Current delay to live stream"
           >
             <b-icon-clock-history />
-            {{latency ? latency.toFixed(1) + 's' : '-'}}
+            {{ latency ? latency.toFixed(1) + "s" : "-" }}
           </div>
           <button
             @click="seekLive"
@@ -110,7 +116,7 @@
         <!-- viewers -->
         <div class="controls-viewers">
           <b-icon-eye-fill />
-          {{ch.viewers}}
+          {{ ch.viewers }}
         </div>
         <!-- settings menu -->
         <b-dropdown dropup right no-caret>
@@ -118,7 +124,11 @@
             <b-icon-gear-fill />
           </template>
           <!-- for some reason chrome won't open a .m3u8 file directly so don't show the playlist link -->
-          <b-dropdown-item :href="playlistURL" @click="$refs.video.pause()" v-if="!isWebKit">
+          <b-dropdown-item
+            :href="playlistURL"
+            @click="$refs.video.pause()"
+            v-if="!isWebKit"
+          >
             <img src="/vlc.png" />
             Watch in VLC
           </b-dropdown-item>
@@ -130,7 +140,9 @@
           </b-dropdown-form>
 
           <b-dropdown-form>
-            <b-form-checkbox v-model="$root.rtcSelected" :disabled="!ch.rtc">Use WebRTC</b-form-checkbox>
+            <b-form-checkbox v-model="$root.rtcSelected" :disabled="!ch.rtc"
+              >Use WebRTC</b-form-checkbox
+            >
           </b-dropdown-form>
         </b-dropdown>
         <!-- fullscreen -->
@@ -164,7 +176,7 @@ import {
   BIconPlayFill,
   BIconSoundwave,
   BIconVolumeMuteFill,
-  BIconVolumeUpFill
+  BIconVolumeUpFill,
 } from "bootstrap-vue";
 
 import { HLSPlayer, RTCPlayer } from "../player.js";
@@ -186,7 +198,7 @@ export default {
     BIconSoundwave,
     BIconVolumeMuteFill,
     BIconVolumeUpFill,
-    VueSlider
+    VueSlider,
   },
   data() {
     return {
@@ -203,7 +215,7 @@ export default {
       keyTimer: null,
       keyPressed: false,
       atTail: false,
-      showCopyVLC: false
+      showCopyVLC: false,
     };
   },
   created() {
@@ -246,6 +258,7 @@ export default {
     },
     webBase() {
       return (
+        this.$root.playBase +
         "/hd/" +
         encodeURIComponent(this.ch.name) +
         "/" +
@@ -257,7 +270,7 @@ export default {
     },
     playlistURL() {
       return "/live/" + encodeURIComponent(this.ch.name) + ".m3u8";
-    }
+    },
   },
   methods: {
     onFullscreen() {
@@ -345,13 +358,13 @@ export default {
               title: "Stream URL copied",
               isStatus: true,
               toaster: "b-toaster-bottom-right",
-              autoHideDelay: 2000
+              autoHideDelay: 2000,
             }
           );
         });
       });
-    }
-  }
+    },
+  },
 };
 </script>
 

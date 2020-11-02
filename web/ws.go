@@ -2,6 +2,8 @@ package web
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -11,7 +13,6 @@ import (
 	"eaglesong.dev/gunk/sinks/playrtc"
 	"github.com/gorilla/websocket"
 	"github.com/pion/webrtc/v2"
-	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -68,7 +69,7 @@ func (w *wsConn) recvLoop(ctx context.Context) error {
 		var m wsMsg
 		if err := w.conn.ReadJSON(&m); err != nil {
 			if ctx.Err() == nil && !websocket.IsCloseError(err, websocket.CloseGoingAway) {
-				return errors.Wrap(err, "read")
+				return fmt.Errorf("read: %w", err)
 			}
 			break
 		}
@@ -90,12 +91,12 @@ func (w *wsConn) sendLoop(ctx context.Context) error {
 				return io.EOF
 			}
 			if err := w.conn.WriteJSON(msg); err != nil {
-				return errors.Wrap(err, "write")
+				return fmt.Errorf("write: %w", err)
 			}
 		case <-t.C:
 			msg := wsMsg{Type: "ts", Time: time.Now().UnixNano() / 1000000}
 			if err := w.conn.WriteJSON(msg); err != nil {
-				return errors.Wrap(err, "write")
+				return fmt.Errorf("write: %w", err)
 			}
 		}
 	}

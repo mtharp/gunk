@@ -44,7 +44,10 @@ func (c *Conn) handleDescribe(req *Request) error {
 	hdr.Set("Content-Type", "application/sdp")
 	c.ssrc = rand.Uint32()
 	c.tracks = make([]*track, len(streams))
-	ses := sdp.NewJSEPSessionDescription(false)
+	ses, err := sdp.NewJSEPSessionDescription(false)
+	if err != nil {
+		return err
+	}
 	var pt uint8 = 96
 	for i, stream := range streams {
 		var codec *webrtc.RTPCodec

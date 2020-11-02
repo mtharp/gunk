@@ -2,6 +2,7 @@ package ingest
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -13,7 +14,6 @@ import (
 	"eaglesong.dev/gunk/sinks/rtsp"
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/format/ts"
-	"github.com/pkg/errors"
 )
 
 var ErrNoChannel = errors.New("channel not found")
@@ -35,6 +35,9 @@ func (m *Manager) ServeTS(rw http.ResponseWriter, req *http.Request, name string
 }
 
 func (m *Manager) ServeWeb(rw http.ResponseWriter, req *http.Request, name string) error {
+	if req.Header.Get("Origin") != "" {
+		rw.Header().Set("Access-Control-Allow-Origin", "*")
+	}
 	ch := m.channel(name)
 	if ch == nil {
 		return ErrNoChannel

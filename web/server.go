@@ -16,6 +16,7 @@ import (
 type Server struct {
 	Secure        bool     // set secure cookies
 	BaseURL       string   // base URL
+	HLSBase       string   // base URL for web playback
 	AdvertiseRTMP string   // base URL to advertise for RTMP ingest
 	AdvertiseLive *url.URL // base URL to advertise for direct HTTP streams
 
@@ -43,8 +44,8 @@ func (s *Server) Handler() http.Handler {
 	// video
 	r.HandleFunc("/live/{channel}.ts", s.viewPlayTS).Methods("GET").Name("live")
 	r.HandleFunc("/live/{channel}.ts", s.viewPublishTS).Methods("PUT", "POST")
-	r.HandleFunc("/live/{channel}.m3u8", s.viewPlaylist).Methods("GET")
-	r.HandleFunc("/hd/{channel}/{filename}", s.viewPlayWeb).Methods("GET")
+	r.HandleFunc("/live/{channel}.m3u8", s.viewPlaylist).Methods("GET", "HEAD")
+	r.HandleFunc("/hd/{channel}/{filename}", s.viewPlayWeb).Methods("GET", "HEAD")
 	// RTC
 	r.HandleFunc("/sdp/{channel}", s.viewPlaySDP).Methods("POST")
 	// UI

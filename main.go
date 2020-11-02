@@ -58,6 +58,9 @@ func main() {
 	} else {
 		s.AdvertiseLive = u
 	}
+	if v := os.Getenv("HLS_URL"); v != "" {
+		s.HLSBase = v
+	}
 	if v := os.Getenv("WORK_DIR"); v != "" {
 		if err := os.MkdirAll(v, 0700); err != nil {
 			log.Fatalln("error:", err)
