@@ -57,7 +57,9 @@ func (s *Server) viewChannelInfo(rw http.ResponseWriter, req *http.Request) {
 	if s.HLSBase != "" {
 		ret.BaseURL = strings.TrimSuffix(s.HLSBase, "/")
 	}
-	rw.Header().Set("Access-Control-Allow-Origin", "*")
+	if req.Header.Get("Origin") != "" {
+		rw.Header().Set("Access-Control-Allow-Origin", "*")
+	}
 	writeJSON(rw, ret)
 }
 

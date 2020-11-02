@@ -35,7 +35,9 @@ func (m *Manager) ServeTS(rw http.ResponseWriter, req *http.Request, name string
 }
 
 func (m *Manager) ServeHLS(rw http.ResponseWriter, req *http.Request, name string) error {
-	rw.Header().Set("Access-Control-Allow-Origin", "*")
+	if req.Header.Get("Origin") != "" {
+		rw.Header().Set("Access-Control-Allow-Origin", "*")
+	}
 	ch := m.channel(name)
 	if ch == nil {
 		return ErrNoChannel
