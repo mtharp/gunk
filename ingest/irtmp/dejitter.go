@@ -28,10 +28,10 @@ var stdRates = []time.Duration{
 
 // DeJitter fixes timestamps that got rounded to the nearest millisecond.
 // It assumes a standard framerate is in use and nudges the timestamp on each packet.
-// This doesn't work for 29.97/59.94 fps but it doesn't make it notably worse either.
 type DeJitter struct {
-	lastV time.Duration
-	lastA time.Duration
+	lastV  time.Duration
+	lastA  time.Duration
+	vtimes []time.Duration
 }
 
 // find the nearest framerate matching a inter-frame gap and tweak the packet time to match
@@ -76,7 +76,11 @@ func (j *DeJitter) ModifyPacket(pkt *av.Packet, streams []av.CodecData, videoidx
 		if gap == 0 {
 			return
 		}
+		ntsc := j.detectNTSC(pkt.Time)
 		for _, candRate := range stdRates {
+			if ntsc {
+				candRate = candRate * 1001 / 1000
+			}
 			if applyRate(pkt, gap, candRate) {
 				break
 			}
@@ -95,4 +99,22 @@ func (j *DeJitter) ModifyPacket(pkt *av.Packet, streams []av.CodecData, videoidx
 		j.lastA = pkt.Time
 	}
 	return
+}
+
+func (j *DeJitter) detectNTSC(t time.Duration) bool {
+	// need a longer span to distinguish NTSC rates, so gather 1 second's worth
+	j.vtimes = append(j.vtimes, t)
+	z := len(j.vtimes) - 1
+	delta := j.vtimes[z] - j.vtimes[0]
+	if delta < time.Second-rateMatch {
+		// not enough samples
+		return false
+	}
+	// trim samples beyond 1 second
+	copy(j.vtimes, j.vtimes[1:])
+	j.vtimes = j.vtimes[:z]
+	// if NTSC then 30 frames should take 1.001 seconds
+	// same goes for 24 or 60 although those don't divide evenly into a 90000
+	// timescale, at least they will dither nicely
+	return delta > 1000500*time.Microsecond
 }
