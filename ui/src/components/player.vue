@@ -144,6 +144,11 @@
               >Use WebRTC</b-form-checkbox
             >
           </b-dropdown-form>
+          <b-dropdown-form>
+            <b-form-checkbox v-model="$root.lowLatency"
+              >Low Latency</b-form-checkbox
+            >
+          </b-dropdown-form>
         </b-dropdown>
         <!-- fullscreen -->
         <button
@@ -230,7 +235,7 @@ export default {
       this.player = new RTCPlayer(video, this.sdpURL);
       this.atTail = true;
     } else {
-      this.player = new HLSPlayer(video, this.webBase);
+      this.player = new HLSPlayer(video, this.webURL, this.$root.lowLatency);
       this.latencyTimer = window.setInterval(this.updateLatency, 1000);
     }
   },
@@ -256,14 +261,8 @@ export default {
     volumeClasses() {
       return { volume: true, "key-pressed": this.keyPressed };
     },
-    webBase() {
-      return (
-        this.$root.playBase +
-        "/hd/" +
-        encodeURIComponent(this.ch.name) +
-        "/" +
-        encodeURIComponent(this.ch.pub_id)
-      );
+    webURL() {
+      return this.ch.web_url;
     },
     sdpURL() {
       return "/sdp/" + encodeURIComponent(this.ch.name);
@@ -338,8 +337,7 @@ export default {
       if (!this.playing) {
         this.latency = 0;
       }
-      const ts = this.$root.serverTime();
-      const latency = this.player.latencyTo(ts);
+      const latency = this.player.latencyTo();
       if (latency !== null) {
         [this.latency, this.atTail] = latency;
       }

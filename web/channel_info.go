@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"eaglesong.dev/gunk/model"
@@ -18,10 +17,10 @@ func (s *Server) listChannels() ([]*model.ChannelInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+	s.Channels.PopulateLive(infos)
 	for _, info := range infos {
 		s.populateChannel(info)
 	}
-	s.Channels.PopulateLive(infos)
 	return infos, nil
 }
 
@@ -33,6 +32,13 @@ func (s *Server) populateChannel(info *model.ChannelInfo) {
 		liveU = s.AdvertiseLive.ResolveReference(liveU)
 	}
 	info.LiveURL = liveU.String()
+	if info.WebURL != "" {
+		webU, _ := s.router.Get("web").URL("channel", info.Name, "filename", info.WebURL)
+		if s.HLSBase != nil {
+			webU = s.HLSBase.ResolveReference(webU)
+		}
+		info.WebURL = webU.String()
+	}
 }
 
 func (s *Server) viewChannelInfo(rw http.ResponseWriter, req *http.Request) {
@@ -45,7 +51,6 @@ func (s *Server) viewChannelInfo(rw http.ResponseWriter, req *http.Request) {
 		Time     int64                         `json:"time"`
 		Channels map[string]*model.ChannelInfo `json:"channels"`
 		Recent   []string                      `json:"recent"`
-		BaseURL  string                        `json:"base_url"`
 	}{
 		Time:     time.Now().UnixNano() / 1000000,
 		Channels: make(map[string]*model.ChannelInfo),
@@ -53,9 +58,6 @@ func (s *Server) viewChannelInfo(rw http.ResponseWriter, req *http.Request) {
 	for _, info := range infos {
 		ret.Channels[info.Name] = info
 		ret.Recent = append(ret.Recent, info.Name)
-	}
-	if s.HLSBase != "" {
-		ret.BaseURL = strings.TrimSuffix(s.HLSBase, "/")
 	}
 	if req.Header.Get("Origin") != "" {
 		rw.Header().Set("Access-Control-Allow-Origin", "*")

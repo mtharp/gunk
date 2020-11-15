@@ -59,7 +59,10 @@ func main() {
 		s.AdvertiseLive = u
 	}
 	if v := os.Getenv("HLS_URL"); v != "" {
-		s.HLSBase = v
+		s.HLSBase, err = url.Parse(v)
+		if err != nil {
+			log.Fatalln("HLS_URL:", err)
+		}
 	}
 	if v := os.Getenv("WORK_DIR"); v != "" {
 		if err := os.MkdirAll(v, 0700); err != nil {

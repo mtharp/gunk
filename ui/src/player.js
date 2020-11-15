@@ -1,4 +1,5 @@
-import { MediaPlayer, Debug } from 'dashjs';
+import Hls from 'hls.js/dist/hls';
+import { MediaPlayer } from 'dashjs';
 import Axios from 'axios';
 
 // play video when ready and restore and save volume
@@ -52,76 +53,58 @@ function autoplay (video) {
 }
 
 export class HLSPlayer {
-  constructor (video, webBase) {
+  constructor (video, webURL, lowLatencyMode) {
     autoplay(video);
     this.video = video;
     this.stream = null;
-    this.stream = MediaPlayer().create();
-    this.stream.initialize();
-    this.stream.updateSettings({
-      streaming: {
-        // lowLatencyEnabled: true,
-        liveDelay: 1,
-        liveCatchUpMinDrift: 0.5,
-        liveCatchUpPlaybackRate: 0.05
-      },
-      debug: {
-        logLevel: Debug.LOG_LEVEL_DEBUG
+    if (webURL.endsWith('.m3u8')) {
+      if (Hls.isSupported()) {
+        this.stream = new Hls({
+          bitrateTest: false,
+          liveDurationInfinity: true,
+          liveBackBufferLength: 30,
+          lowLatencyMode: lowLatencyMode
+        });
+        this.stream.attachMedia(video);
+        this.stream.loadSource(webURL);
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = webURL;
       }
-    });
-    // don't autoplay, the handler here will take care of it and this way the poster will be displayed in the meantime
-    this.stream.setAutoPlay(false);
-    this.stream.attachSource(webBase + '.mpd');
-    this.stream.attachView(video);
-    // if (video.canPlayType('application/vnd.apple.mpegurl')) {
-    //   video.src = hlsURL;
-    // }
+    } else if (webURL.endsWith('.mpd')) {
+      this.stream = MediaPlayer().create();
+      this.stream.initialize();
+      this.stream.updateSettings({
+        streaming: { lowLatencyEnabled: lowLatencyMode }
+      });
+      this.stream.setAutoPlay(false);
+      this.stream.attachSource(webURL);
+      this.stream.attachView(video);
+    }
   }
 
   destroy () {
     this.video = null;
     if (this.stream !== null) {
-      this.stream.reset();
+      if ('destroy' in this.stream) {
+        this.stream.destroy();
+      } else if ('reset' in this.stream) {
+        this.stream.reset();
+      }
       this.stream = null;
     }
   }
 
   seekLive () {
     this.video.play();
-    // seek to end and play
-    // const details = this.details();
-    // if (details === null || details.fragments.length < 3) {
-    //   this.video.play();
-    //   return;
-    // }
-    // for (let i = details.fragments.length - 1; i >= 0; i--) {
-    //   const f = details.fragments[i];
-    //   if (f.appendedPTS) {
-    //     // streaming this segment and chunks are ready to play
-    //     this.video.currentTime = f.appendedPTS - this.targetBuffer;
-    //     // console.log('s1', details.fragments.length - i, f);
-    //     return;
-    //   } else if (f.endPTS) {
-    //     // segment is fully processed, start from here
-    //     if ('appendedPTS' in f) {
-    //       // the next segment is streaming but hasn't appended yet, still we can start near the end of this one and hopefully it will be ready
-    //       // console.log('s2', details.fragments.length - i, f);
-    //       this.video.currentTime = f.endPTS - this.targetBuffer;
-    //     } else {
-    //       // must wait an additional segment length because the next one isn't streaming
-    //       // console.log('s3', details.fragments.length - i, f);
-    //       this.video.currentTime = f.start - this.targetBuffer;
-    //     }
-    //     return;
-    // }
   }
 
   latencyTo () {
-    try {
+    if ('latency' in this.stream) {
+      return [this.stream.latency, true];
+    } else if ('getCurrentLiveLatency' in this.stream) {
       return [this.stream.getCurrentLiveLatency(), true];
-    } catch (error) {
-      return null;
     }
+    return null;
   }
 }
 

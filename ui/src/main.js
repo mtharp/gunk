@@ -23,8 +23,8 @@ new Vue({
       channels: {},
       recentChannels: [],
       serverTimeBase: null,
-      playBase: '',
       rtcSelected: localStorage.getItem('playerType') === 'RTC',
+      lowLatency: localStorage.getItem('lowLatency') !== 'false',
       user: {
         id: null,
         username: null,
@@ -40,7 +40,6 @@ new Vue({
           this.channels = response.data.channels;
           this.recentChannels = response.data.recent;
           this.serverTimeBase = response.data.time - performance.now();
-          this.playBase = response.data.base_url;
         });
     },
     updateUser () {
@@ -82,6 +81,9 @@ new Vue({
   watch: {
     rtcSelected (rtcSelected) {
       localStorage.setItem('playerType', rtcSelected ? 'RTC' : 'HLS');
+    },
+    lowLatency (lowLatency) {
+      localStorage.setItem('lowLatency', lowLatency);
     }
   },
   mounted () {

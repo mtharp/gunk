@@ -8,6 +8,7 @@ type ChannelInfo struct {
 	Last    int64  `json:"last"`
 	Thumb   string `json:"thumb"`
 	LiveURL string `json:"live_url"`
+	WebURL  string `json:"web_url"`
 	PubID   string `json:"pub_id"`
 	Viewers int    `json:"viewers"`
 	RTC     bool   `json:"rtc"`

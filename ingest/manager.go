@@ -1,6 +1,7 @@
 package ingest
 
 import (
+	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -8,7 +9,6 @@ import (
 	"eaglesong.dev/gunk/ingest/ftl"
 	"eaglesong.dev/gunk/model"
 	"eaglesong.dev/gunk/sinks/grabber"
-	"eaglesong.dev/hls/dash"
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/av/pubsub"
 )
@@ -34,13 +34,20 @@ type channel struct {
 	mu        sync.Mutex
 	ingest    *pubsub.Queue
 	aac, opus *pubsub.Queue
-	web       *dash.Publisher
+	web       publisher
 	stoppedAt time.Time
 
 	live, rtc uintptr
 	viewers   int32 // excluding web
 	webv      sync.Map
 	webvTotal int32
+}
+
+type publisher interface {
+	av.Muxer
+	http.Handler
+	Close()
+	Name() string
 }
 
 func (m *Manager) channel(name string) *channel {
@@ -101,7 +108,7 @@ func (ch *channel) countWebViewers() {
 	atomic.StoreInt32(&ch.webvTotal, views)
 }
 
-func (ch *channel) getWeb() *dash.Publisher {
+func (ch *channel) getWeb() publisher {
 	if ch == nil {
 		return nil
 	}

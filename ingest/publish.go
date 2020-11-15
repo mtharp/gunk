@@ -96,7 +96,7 @@ func (m *Manager) Cleanup() {
 	})
 }
 
-func (ch *channel) setStream(q, aacq, opusq *pubsub.Queue, workDir string) *dash.Publisher {
+func (ch *channel) setStream(q, aacq, opusq *pubsub.Queue, workDir string) publisher {
 	ch.mu.Lock()
 	defer ch.mu.Unlock()
 	if ch.ingest != nil {
