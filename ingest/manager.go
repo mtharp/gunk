@@ -1,7 +1,6 @@
 package ingest
 
 import (
-	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -9,6 +8,7 @@ import (
 	"eaglesong.dev/gunk/ingest/ftl"
 	"eaglesong.dev/gunk/model"
 	"eaglesong.dev/gunk/sinks/grabber"
+	"eaglesong.dev/hls"
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/av/pubsub"
 )
@@ -22,6 +22,7 @@ type Manager struct {
 	PublishEvent PublishEvent
 	FTL          ftl.Server
 	WorkDir      string
+	UseDASH      bool
 
 	channels sync.Map
 }
@@ -34,20 +35,13 @@ type channel struct {
 	mu        sync.Mutex
 	ingest    *pubsub.Queue
 	aac, opus *pubsub.Queue
-	web       publisher
+	web       *hls.Publisher
 	stoppedAt time.Time
 
 	live, rtc uintptr
 	viewers   int32 // excluding web
 	webv      sync.Map
 	webvTotal int32
-}
-
-type publisher interface {
-	av.Muxer
-	http.Handler
-	Close()
-	Name() string
 }
 
 func (m *Manager) channel(name string) *channel {
@@ -108,7 +102,7 @@ func (ch *channel) countWebViewers() {
 	atomic.StoreInt32(&ch.webvTotal, views)
 }
 
-func (ch *channel) getWeb() publisher {
+func (ch *channel) getWeb() *hls.Publisher {
 	if ch == nil {
 		return nil
 	}

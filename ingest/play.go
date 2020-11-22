@@ -109,7 +109,11 @@ func (m *Manager) PopulateLive(infos []*model.ChannelInfo) {
 		}
 		info.Live = ch.isLive()
 		info.Viewers = ch.currentViewers()
-		info.WebURL = ch.getWeb().Name()
+		if m.UseDASH {
+			info.WebURL = ch.getWeb().MPD()
+		} else {
+			info.WebURL = ch.getWeb().Playlist()
+		}
 		info.RTC = atomic.LoadUintptr(&ch.rtc) != 0
 	}
 }

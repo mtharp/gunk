@@ -73,6 +73,9 @@ func main() {
 	if v, _ := strconv.Atoi(os.Getenv("OPUS_BITRATE")); v > 0 {
 		s.Channels.OpusBitrate = v
 	}
+	if os.Getenv("USE_DASH") != "" {
+		s.Channels.UseDASH = true
+	}
 	if err := model.Connect(); err != nil {
 		log.Fatalln("error: connecting to database:", err)
 	}

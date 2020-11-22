@@ -11,7 +11,7 @@ import (
 	"eaglesong.dev/gunk/model"
 	"eaglesong.dev/gunk/sinks/grabber"
 	"eaglesong.dev/gunk/transcode/opus"
-	"eaglesong.dev/hls/dash"
+	"eaglesong.dev/hls"
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/av/pubsub"
 	"golang.org/x/sync/errgroup"
@@ -96,7 +96,7 @@ func (m *Manager) Cleanup() {
 	})
 }
 
-func (ch *channel) setStream(q, aacq, opusq *pubsub.Queue, workDir string) publisher {
+func (ch *channel) setStream(q, aacq, opusq *pubsub.Queue, workDir string) *hls.Publisher {
 	ch.mu.Lock()
 	defer ch.mu.Unlock()
 	if ch.ingest != nil {
@@ -108,7 +108,7 @@ func (ch *channel) setStream(q, aacq, opusq *pubsub.Queue, workDir string) publi
 	if ch.web != nil {
 		ch.web.Close()
 	}
-	ch.web = &dash.Publisher{
+	ch.web = &hls.Publisher{
 		WorkDir: workDir,
 	}
 	ch.stoppedAt = time.Time{}
