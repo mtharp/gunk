@@ -8,7 +8,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/kr/pretty"
 	"github.com/nareix/joy4/av"
 	"github.com/pion/rtp"
 )
@@ -157,9 +156,6 @@ func (r *rtpReader) Streams() ([]av.CodecData, error) {
 		if cd, err := def.Parser.CodecData(); err != nil {
 			return nil, err
 		} else if cd != nil {
-			if streams[i] == nil {
-				pretty.Println("stream", i, cd)
-			}
 			streams[i] = cd
 		}
 		ready := true

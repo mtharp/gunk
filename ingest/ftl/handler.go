@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/nareix/joy4/av/pktque"
 	"github.com/nareix/joy4/codec/opusparser"
 )
 
@@ -171,7 +172,11 @@ func (c *Conn) handleLive() error {
 	remote := ip.String()
 	go func() {
 		defer c.s.delReceiver(hashKeys, rch)
-		if err := c.s.Publish(c.auth, "ftl", remote, pktSrc); err != nil {
+		src := &pktque.FilterDemuxer{
+			Demuxer: pktSrc,
+			Filter:  new(CombineSlices),
+		}
+		if err := c.s.Publish(c.auth, "ftl", remote, src); err != nil {
 			log.Printf("[ftl] error: publishing from %s: %s", remote, err)
 			c.cancel()
 		}

@@ -4,15 +4,18 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"io"
+	"math/big"
 	"net/url"
 
 	"github.com/jackc/pgx"
+	"github.com/jackc/pgx/pgtype"
 )
 
 type ChannelDef struct {
 	Name     string `json:"name"`
 	Key      string `json:"key"`
 	Announce bool   `json:"announce"`
+	FTLKey   string `json:"ftl_key"`
 
 	RTMPDir  string `json:"rtmp_dir"`
 	RTMPBase string `json:"rtmp_base"`
@@ -25,7 +28,7 @@ func (d *ChannelDef) SetURL(base string) {
 }
 
 func ListChannelDefs(userID string) (defs []*ChannelDef, err error) {
-	rows, err := db.Query("SELECT name, key, announce FROM channel_defs WHERE user_id = $1", userID)
+	rows, err := db.Query("SELECT name, key, announce, ftl_id FROM channel_defs WHERE user_id = $1", userID)
 	if err != nil {
 		return
 	}
@@ -33,9 +36,11 @@ func ListChannelDefs(userID string) (defs []*ChannelDef, err error) {
 	defs = []*ChannelDef{}
 	for rows.Next() {
 		def := new(ChannelDef)
-		if err = rows.Scan(&def.Name, &def.Key, &def.Announce); err != nil {
+		var ftlID pgtype.Text
+		if err = rows.Scan(&def.Name, &def.Key, &def.Announce, &ftlID); err != nil {
 			return
 		}
+		def.FTLKey = ftlID.String + "," + def.Key
 		defs = append(defs, def)
 	}
 	err = rows.Err()
@@ -48,11 +53,18 @@ func CreateChannel(userID, name string) (def *ChannelDef, err error) {
 		return
 	}
 	key := hex.EncodeToString(b)
-	_, err = db.Exec("INSERT INTO channel_defs (user_id, name, key, announce) VALUES ($1, $2, $3, true)", userID, name, key)
+	ftlID, _ := rand.Int(rand.Reader, new(big.Int).SetInt64(1<<31))
+	_, err = db.Exec("INSERT INTO channel_defs (user_id, name, key, announce, ftl_id) VALUES ($1, $2, $3, true, $4)",
+		userID, name, key, ftlID.String())
 	if err != nil {
 		return
 	}
-	return &ChannelDef{Name: name, Key: key, Announce: true}, nil
+	return &ChannelDef{
+		Name:     name,
+		Key:      key,
+		Announce: true,
+		FTLKey:   ftlID.String() + "," + key,
+	}, nil
 }
 
 func UpdateChannel(userID, name string, announce bool) error {
