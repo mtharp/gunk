@@ -81,7 +81,8 @@
             v-b-tooltip.hover
             title="Current delay to live stream"
           >
-            <b-icon-clock-history />
+            <b-icon-skip-forward-fill v-if="catchingUp" />
+            <b-icon-clock-history v-else />
             {{ latency ? latency.toFixed(1) + "s" : "-" }}
           </div>
           <button
@@ -181,7 +182,8 @@ import {
   BIconPlayFill,
   BIconSoundwave,
   BIconVolumeMuteFill,
-  BIconVolumeUpFill
+  BIconVolumeUpFill,
+  BIconSkipForwardFill
 } from "bootstrap-vue";
 
 import { HLSPlayer, RTCPlayer } from "../player.js";
@@ -203,6 +205,7 @@ export default {
     BIconSoundwave,
     BIconVolumeMuteFill,
     BIconVolumeUpFill,
+    BIconSkipForwardFill,
     VueSlider
   },
   data() {
@@ -220,6 +223,7 @@ export default {
       keyTimer: null,
       keyPressed: false,
       atTail: false,
+      catchingUp: false,
       showCopyVLC: false
     };
   },
@@ -342,6 +346,7 @@ export default {
         this.latency = 0;
         return;
       }
+      this.catchingUp = this.player.video.playbackRate != 1;
       const latency = this.player.latencyTo();
       if (latency !== null) {
         [this.latency, this.atTail] = latency;

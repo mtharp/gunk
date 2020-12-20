@@ -30,6 +30,7 @@ function autoplay (video) {
     };
   };
   video.oncanplay = function () {
+    video.oncanplay = null;
     // restore saved volume
     const vol = localStorage.getItem('volume');
     if (vol) {
@@ -73,7 +74,7 @@ export class HLSPlayer {
     };
     if (lowLatencyMode) {
       conf.liveBackBufferLength = 0;
-      conf.liveSyncDuration = 0.5;
+      conf.liveSyncDuration = 1;
       conf.maxLiveSyncPlaybackRate = 1.1;
     } else {
       conf.liveSyncDurationCount = 2;
@@ -81,6 +82,7 @@ export class HLSPlayer {
     this.stream = new Hls(conf);
     this.stream.attachMedia(video);
     this.stream.loadSource(webURL);
+    this.stream.on(Hls.Events.MANIFEST_LOADED, () => video.oncanplay());
   }
 
   destroy () {
