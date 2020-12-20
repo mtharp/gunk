@@ -17,7 +17,7 @@
               v-model="def.announce"
               switch
               @change="doUpdate(def)"
-              >Announce
+              >Announce to Discord:
               {{ def.announce ? "Enabled" : "Disabled" }}</b-form-checkbox
             >
           </b-form-group>
@@ -64,7 +64,7 @@
               </b-form>
             </b-card-text>
           </b-tab>
-          <b-tab title="FTL">
+          <b-tab title="FTL (alpha)">
             <b-card-text>
               <b-form v-if="selected">
                 <b-form-group label="Stream Key">
@@ -79,7 +79,7 @@
                 </b-form-group>
                 <b-form-group
                   label="OBS Services Config Snippet"
-                  description='Open C:\Users\YOURACCOUNT\AppData\Roaming\obs-studio\plugin_config\rtmp-services\services.json in Notepad and paste this block after the line: "services": [ and then restart OBS and pick the new entry from the services drop-down'
+                  description='Open C:\Users\YOURACCOUNT\AppData\Roaming\obs-studio\plugin_config\rtmp-services\services.json in Notepad and paste this block after the line: "services": [ and then restart OBS and pick the new entry from the services drop-down. This will probably break every time you update OBS.'
                 >
                   <b-form-textarea readonly rows="18" :value="ftl_config" />
                 </b-form-group>
@@ -95,10 +95,10 @@
             <b-card-text>
               <ul>
                 <li>Output Mode: Advanced</li>
-                <li>Keyframe Interval: 1 second</li>
-                <li>Preset: Low-Latency Quality</li>
+                <li>Keyframe Interval: 2 seconds</li>
+                <li>Preset: Quality</li>
                 <li>Profile: high</li>
-                <li>Max B-frames: 0</li>
+                <li><strong>Max B-frames: 0</strong></li>
               </ul>
             </b-card-text>
           </b-tab>
@@ -106,11 +106,11 @@
             <b-card-text>
               <ul>
                 <li>Output Mode: Advanced</li>
-                <li>Keyframe Interval: 1 second</li>
+                <li>Keyframe Interval: 2 seconds</li>
                 <li>Preset: veryfast</li>
                 <li>Profile: high</li>
-                <li>Tune: zerolatency</li>
-                <li>x264 options: bframes=0</li>
+                <li>Tune: (none)</li>
+                <li><strong>x264 options: bframes=0</strong></li>
               </ul>
             </b-card-text>
           </b-tab>
@@ -142,8 +142,8 @@ export default {
   },
   mounted() {
     axios.get("/api/mychannels").then(response => {
-      this.defs = response.data.channels
-      this.ftl_config = response.data.ftl
+      this.defs = response.data.channels;
+      this.ftl_config = response.data.ftl;
     });
   },
   methods: {
@@ -172,9 +172,19 @@ export default {
       axios.put("/api/mychannels/" + encodeURIComponent(def.name), def);
     },
     doDelete(def) {
-      axios
-        .delete("/api/mychannels/" + encodeURIComponent(def.name))
-        .then(() => this.defs.splice(this.defs.indexOf(def), 1));
+      this.$bvModal
+        .msgBoxConfirm("Delete channel " + def.name + "?", {
+          title: "Delete Channel",
+          okVariant: "danger",
+          okTitle: "Delete"
+        })
+        .then(confirmed => {
+          if (confirmed) {
+            axios
+              .delete("/api/mychannels/" + encodeURIComponent(def.name))
+              .then(() => this.defs.splice(this.defs.indexOf(def), 1));
+          }
+        });
     },
     doShow(def) {
       this.selected = def;
