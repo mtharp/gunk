@@ -3,11 +3,20 @@
     <!-- ensure player gets re-rendered by using a key unique to channel and delivery type -->
     <player
       v-if="chInfo.live"
-      :key="(rtcActive ? 'rtc.' : 'hls.')+channel"
+      :key="
+        (rtcActive ? 'rtc.' : 'hls.') +
+        ($root.lowLatency ? 'll.' : '') +
+        channel
+      "
       :ch="chInfo"
       :rtcActive="rtcActive"
+      :lowLatency="$root.lowLatency"
     />
-    <img v-if="!chInfo.live && chInfo.thumb" :src="chInfo.thumb" class="player-thumb" />
+    <img
+      v-if="!chInfo.live && chInfo.thumb"
+      :src="chInfo.thumb"
+      class="player-thumb"
+    />
     <div v-if="!chInfo.live" class="player-shade">OFFLINE</div>
   </div>
 </template>

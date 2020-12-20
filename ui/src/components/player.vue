@@ -181,14 +181,14 @@ import {
   BIconPlayFill,
   BIconSoundwave,
   BIconVolumeMuteFill,
-  BIconVolumeUpFill,
+  BIconVolumeUpFill
 } from "bootstrap-vue";
 
 import { HLSPlayer, RTCPlayer } from "../player.js";
 
 export default {
   name: "player",
-  props: ["ch", "rtcActive"],
+  props: ["ch", "rtcActive", "lowLatency"],
   components: {
     BIconClipboardData,
     BIconClockHistory,
@@ -203,7 +203,7 @@ export default {
     BIconSoundwave,
     BIconVolumeMuteFill,
     BIconVolumeUpFill,
-    VueSlider,
+    VueSlider
   },
   data() {
     return {
@@ -220,7 +220,7 @@ export default {
       keyTimer: null,
       keyPressed: false,
       atTail: false,
-      showCopyVLC: false,
+      showCopyVLC: false
     };
   },
   created() {
@@ -235,7 +235,11 @@ export default {
       this.player = new RTCPlayer(video, this.sdpURL);
       this.atTail = true;
     } else {
-      this.player = new HLSPlayer(video, this.webURL, this.$root.lowLatency);
+      //if (this.webURL.endsWith('.mpd')) {
+      //  this.player = new DASHPlayer(video, this.webURL, this.lowLatency);
+      //} else {
+      this.player = new HLSPlayer(video, this.webURL, this.lowLatency);
+      //}
       this.latencyTimer = window.setInterval(this.updateLatency, 1000);
     }
   },
@@ -269,7 +273,7 @@ export default {
     },
     playlistURL() {
       return "/live/" + encodeURIComponent(this.ch.name) + ".m3u8";
-    },
+    }
   },
   methods: {
     onFullscreen() {
@@ -336,6 +340,7 @@ export default {
     updateLatency() {
       if (!this.playing) {
         this.latency = 0;
+        return;
       }
       const latency = this.player.latencyTo();
       if (latency !== null) {
@@ -356,13 +361,13 @@ export default {
               title: "Stream URL copied",
               isStatus: true,
               toaster: "b-toaster-bottom-right",
-              autoHideDelay: 2000,
+              autoHideDelay: 2000
             }
           );
         });
       });
-    },
-  },
+    }
+  }
 };
 </script>
 
@@ -453,6 +458,7 @@ export default {
   font-size: 1rem;
 }
 .controls-latency {
+  margin-left: 1rem;
   font-size: 0.85rem;
   color: #888;
 }

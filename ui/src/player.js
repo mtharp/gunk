@@ -1,5 +1,5 @@
 import Hls from 'hls.js/dist/hls';
-import { MediaPlayer } from 'dashjs';
+// import { MediaPlayer } from 'dashjs';
 import Axios from 'axios';
 
 // play video when ready and restore and save volume
@@ -57,56 +57,86 @@ export class HLSPlayer {
     autoplay(video);
     this.video = video;
     this.stream = null;
-    if (webURL.endsWith('.m3u8')) {
-      if (Hls.isSupported()) {
-        this.stream = new Hls({
-          bitrateTest: false,
-          liveDurationInfinity: true,
-          liveBackBufferLength: 30,
-          lowLatencyMode: lowLatencyMode
-        });
-        this.stream.attachMedia(video);
-        this.stream.loadSource(webURL);
-      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    if (!Hls.isSupported()) {
+      if (video.canPlayType('application/vnd.apple.mpegurl')) {
         video.src = webURL;
       }
-    } else if (webURL.endsWith('.mpd')) {
-      this.stream = MediaPlayer().create();
-      this.stream.initialize();
-      this.stream.updateSettings({
-        streaming: { lowLatencyEnabled: lowLatencyMode }
-      });
-      this.stream.setAutoPlay(false);
-      this.stream.attachSource(webURL);
-      this.stream.attachView(video);
+      return;
     }
+    const conf = {
+      // debug: true,
+      bitrateTest: false,
+      liveDurationInfinity: true,
+      liveBackBufferLength: 10,
+      lowLatencyMode: lowLatencyMode,
+      maxLiveSyncPlaybackRate: 1
+    };
+    if (lowLatencyMode) {
+      conf.liveBackBufferLength = 0;
+      conf.liveSyncDuration = 0.5;
+      conf.maxLiveSyncPlaybackRate = 1.1;
+    } else {
+      conf.liveSyncDurationCount = 2;
+    }
+    this.stream = new Hls(conf);
+    this.stream.attachMedia(video);
+    this.stream.loadSource(webURL);
   }
 
   destroy () {
     this.video = null;
     if (this.stream !== null) {
-      if ('destroy' in this.stream) {
-        this.stream.destroy();
-      } else if ('reset' in this.stream) {
-        this.stream.reset();
-      }
+      this.stream.destroy();
       this.stream = null;
     }
   }
 
   seekLive () {
+    this.video.currentTime = this.stream.liveSyncPosition;
     this.video.play();
   }
 
   latencyTo () {
-    if ('latency' in this.stream) {
-      return [this.stream.latency, true];
-    } else if ('getCurrentLiveLatency' in this.stream) {
-      return [this.stream.getCurrentLiveLatency(), true];
+    if (this.stream !== null) {
+      const latency = this.stream.latency;
+      return [latency, latency < 15];
     }
     return null;
   }
 }
+
+// export class DASHPlayer {
+//   constructor (video, webURL, lowLatencyMode) {
+//     autoplay(video);
+//     this.video = video;
+//     this.stream = MediaPlayer().create();
+//     this.stream.initialize();
+//     this.stream.updateSettings({
+//       streaming: { lowLatencyEnabled: lowLatencyMode }
+//     });
+//     this.stream.setAutoPlay(false);
+//     this.stream.attachSource(webURL);
+//     this.stream.attachView(video);
+//   }
+
+//   destroy () {
+//     this.video = null;
+//     if (this.stream !== null) {
+//       this.stream.reset();
+//     }
+//   }
+
+//   seekLive () {
+//     this.video.play();
+//   }
+
+//   latencyTo () {
+//     if (this.stream !== null) {
+//       return [this.stream.getCurrentLiveLatency(), true];
+//     }
+//     return null;
+//   }
+// }
 
 export class RTCPlayer {
   constructor (video, sdpURL) {
