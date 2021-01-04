@@ -4,10 +4,8 @@ go 1.14
 
 replace github.com/nareix/joy4 => ../joy4
 
-replace eaglesong.dev/hls => ../hls
-
 require (
-	eaglesong.dev/hls v1.1.1-0.20200426043048-f48cdd63f891
+	eaglesong.dev/hls v1.2.0
 	github.com/cockroachdb/apd v1.1.0 // indirect
 	github.com/gofrs/uuid v3.3.0+incompatible // indirect
 	github.com/gorilla/mux v1.8.0

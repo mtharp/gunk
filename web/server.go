@@ -42,16 +42,16 @@ func (s *Server) Handler() http.Handler {
 	s.router = r
 	r.HandleFunc("/ws", s.serveWS)
 	// video
-	r.HandleFunc("/live/{channel}.ts", s.viewPlayTS).Methods("GET").Name("live")
+	r.HandleFunc("/live/{channel}.ts", corsOK(s.viewPlayTS)).Methods("GET", "OPTIONS").Name("live")
 	r.HandleFunc("/live/{channel}.ts", s.viewPublishTS).Methods("PUT", "POST")
-	r.HandleFunc("/live/{channel}.m3u8", s.viewPlaylist).Methods("GET", "HEAD")
-	r.HandleFunc("/hd/{channel}/{filename}", s.viewPlayWeb).Methods("GET", "HEAD").Name("web")
+	r.HandleFunc("/live/{channel}.m3u8", corsOK(s.viewPlaylist)).Methods("GET", "HEAD", "OPTIONS")
+	r.HandleFunc("/hd/{channel}/{filename}", corsOK(s.viewPlayWeb)).Methods("GET", "HEAD", "OPTIONS").Name("web")
 	// RTC
 	r.HandleFunc("/sdp/{channel}", s.viewPlaySDP).Methods("POST")
 	// UI
 	uiRoutes(r)
-	r.HandleFunc("/channels.json", s.viewChannelInfo)
-	r.HandleFunc("/thumbs/{channel}/{timestamp}.jpg", s.viewThumb).Name("thumbs")
+	r.HandleFunc("/channels.json", corsOK(s.viewChannelInfo)).Methods("GET", "HEAD", "OPTIONS")
+	r.HandleFunc("/thumbs/{channel}/{timestamp}.jpg", corsOK(s.viewThumb)).Name("thumbs")
 	// login
 	r.HandleFunc("/oauth2/user", s.viewUser).Methods("GET")
 	r.HandleFunc("/oauth2/initiate", s.viewOauthLogin).Methods("GET")
@@ -99,4 +99,18 @@ func writeJSON(rw http.ResponseWriter, d interface{}) {
 	}
 	blob, _ := json.Marshal(d)
 	rw.Write(blob)
+}
+
+func corsOK(f http.HandlerFunc) http.HandlerFunc {
+	return func(rw http.ResponseWriter, req *http.Request) {
+		if req.Header.Get("Origin") != "" && (req.Method == "GET" || req.Method == "HEAD" || req.Method == "OPTIONS") {
+			rw.Header().Set("Access-Control-Allow-Origin", "*")
+			if h := req.Header.Get("Access-Control-Request-Headers"); h != "" {
+				rw.Header().Set("Access-Control-Allow-Headers", h)
+			}
+			rw.Header().Set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
+			rw.Header().Set("Access-Control-Max-Age", "86400")
+		}
+		f(rw, req)
+	}
 }
