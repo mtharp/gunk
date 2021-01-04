@@ -11,7 +11,7 @@
     "axios": "^0.21.0",
     "bootstrap": "^4.5.3",
     "bootstrap-vue": "^2.18.1",
-    "hls.js": "^1.0.0-alpha.5",
+    "hls.js": "^1.0.0-beta.2",
     "lodash": "^4.17.20",
     "vue": "^2.6.12",
     "vue-router": "^3.4.8",
