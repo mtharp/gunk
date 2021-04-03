@@ -1,5 +1,5 @@
-import Hls from 'hls.js/dist/hls';
-// import { MediaPlayer } from 'dashjs';
+// import Hls from 'hls.js/dist/hls';
+import { MediaPlayer } from 'dashjs';
 import Axios from 'axios';
 
 // play video when ready and restore and save volume
@@ -53,92 +53,102 @@ function autoplay (video) {
   };
 }
 
-export class HLSPlayer {
-  constructor (video, webURL, lowLatencyMode) {
-    autoplay(video);
-    this.video = video;
-    this.stream = null;
-    if (!Hls.isSupported()) {
-      if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        video.src = webURL;
-      }
-      return;
-    }
-    const conf = {
-      // debug: true,
-      bitrateTest: false,
-      liveDurationInfinity: true,
-      liveBackBufferLength: 10,
-      lowLatencyMode: lowLatencyMode,
-      maxLiveSyncPlaybackRate: 1
-    };
-    if (lowLatencyMode) {
-      conf.liveBackBufferLength = 0;
-      conf.liveSyncDuration = 1;
-      conf.maxLiveSyncPlaybackRate = 1.1;
-    } else {
-      conf.liveSyncDurationCount = 2;
-    }
-    this.stream = new Hls(conf);
-    this.stream.attachMedia(video);
-    this.stream.loadSource(webURL);
-    this.stream.on(Hls.Events.MANIFEST_LOADED, () => video.oncanplay());
-  }
-
-  destroy () {
-    this.video = null;
-    if (this.stream !== null) {
-      this.stream.destroy();
-      this.stream = null;
-    }
-  }
-
-  seekLive () {
-    this.video.currentTime = this.stream.liveSyncPosition;
-    this.video.play();
-  }
-
-  latencyTo () {
-    if (this.stream !== null) {
-      const latency = this.stream.latency;
-      return [latency, latency < 15];
-    }
-    return null;
-  }
-}
-
-// export class DASHPlayer {
+// export class HLSPlayer {
 //   constructor (video, webURL, lowLatencyMode) {
 //     autoplay(video);
 //     this.video = video;
-//     this.stream = MediaPlayer().create();
-//     this.stream.initialize();
-//     this.stream.updateSettings({
-//       streaming: { lowLatencyEnabled: lowLatencyMode }
-//     });
-//     this.stream.setAutoPlay(false);
-//     this.stream.attachSource(webURL);
-//     this.stream.attachView(video);
+//     this.stream = null;
+//     if (!Hls.isSupported()) {
+//       if (video.canPlayType('application/vnd.apple.mpegurl')) {
+//         video.src = webURL;
+//       }
+//       return;
+//     }
+//     const conf = {
+//       // debug: true,
+//       bitrateTest: false,
+//       liveDurationInfinity: true,
+//       backBufferLength: 10,
+//       lowLatencyMode: lowLatencyMode,
+//       maxLiveSyncPlaybackRate: 1
+//     };
+//     if (lowLatencyMode) {
+//       conf.backBufferLength = 0;
+//       conf.liveSyncDuration = 2;
+//       conf.maxLiveSyncPlaybackRate = 1.1;
+//     } else {
+//       conf.liveSyncDurationCount = 2;
+//     }
+//     this.stream = new Hls(conf);
+//     this.stream.attachMedia(video);
+//     this.stream.loadSource(webURL);
+//     this.stream.on(Hls.Events.MANIFEST_LOADED, () => video.oncanplay());
 //   }
 
 //   destroy () {
 //     this.video = null;
 //     if (this.stream !== null) {
-//       this.stream.reset();
+//       this.stream.destroy();
+//       this.stream = null;
 //     }
 //   }
 
 //   seekLive () {
+//     this.video.currentTime = this.stream.liveSyncPosition;
 //     this.video.play();
 //   }
 
 //   latencyTo () {
 //     if (this.stream !== null) {
-//       return [this.stream.getCurrentLiveLatency(), true];
+//       const latency = this.stream.latency;
+//       return [latency, latency < 15];
 //     }
 //     return null;
 //   }
 // }
+
+export class DASHPlayer {
+  constructor (video, webURL, lowLatencyMode) {
+    autoplay(video);
+    this.video = video;
+    this.stream = MediaPlayer().create();
+    this.stream.initialize();
+    this.stream.updateSettings({
+      streaming: {
+        lowLatencyEnabled: lowLatencyMode,
+        liveDelayFragmentCount: 1,
+        liveCatchup: {
+          playbackRate: 0.1,
+          minDrift: 0.1
+        },
+        utcSynchronization: {
+          timeBetweenSyncAttempts: 30
+        }
+      }
+    });
+    this.stream.setAutoPlay(false);
+    this.stream.attachSource(webURL);
+    this.stream.attachView(video);
+  }
+
+  destroy () {
+    this.video = null;
+    if (this.stream !== null) {
+      this.stream.reset();
+    }
+  }
+
+  seekLive () {
+    this.video.play();
+  }
+
+  latencyTo () {
+    if (this.stream !== null) {
+      return [this.stream.getCurrentLiveLatency(), true];
+    }
+    return null;
+  }
+}
 
 export class RTCPlayer {
   constructor (video, sdpURL) {

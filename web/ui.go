@@ -44,7 +44,7 @@ func uiRoutes(r *mux.Router) {
 	})
 }
 
-func middleware(h http.Handler) http.Handler {
+func noCache(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		rw.Header().Set("Cache-Control", "private, no-cache, must-revalidate")
 		rw.Header().Set("Referrer-Policy", "no-referrer")

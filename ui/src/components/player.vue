@@ -186,7 +186,7 @@ import {
   BIconSkipForwardFill
 } from "bootstrap-vue";
 
-import { HLSPlayer, RTCPlayer } from "../player.js";
+import { DASHPlayer, RTCPlayer } from "../player.js";
 
 export default {
   name: "player",
@@ -239,11 +239,11 @@ export default {
       this.player = new RTCPlayer(video, this.sdpURL);
       this.atTail = true;
     } else {
-      //if (this.webURL.endsWith('.mpd')) {
-      //  this.player = new DASHPlayer(video, this.webURL, this.lowLatency);
-      //} else {
-      this.player = new HLSPlayer(video, this.webURL, this.lowLatency);
-      //}
+      // if (this.webURL.endsWith(".mpd")) {
+      this.player = new DASHPlayer(video, this.webURL, this.lowLatency);
+      // } else {
+      //   this.player = new HLSPlayer(video, this.webURL, this.lowLatency);
+      // }
       this.latencyTimer = window.setInterval(this.updateLatency, 1000);
     }
   },

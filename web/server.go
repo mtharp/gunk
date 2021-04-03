@@ -62,7 +62,15 @@ func (s *Server) Handler() http.Handler {
 	r.HandleFunc("/api/mychannels", s.viewDefsCreate).Methods("POST")
 	r.HandleFunc("/api/mychannels/{name}", s.viewDefsUpdate).Methods("PUT")
 	r.HandleFunc("/api/mychannels/{name}", s.viewDefsDelete).Methods("DELETE")
-	return middleware(r)
+	r.HandleFunc("/health", s.viewHealth).Methods("GET")
+	h := noCache(r)
+	h = accessLog(h)
+	h = realIPMiddleware(h)
+	return h
+}
+
+func (s *Server) viewHealth(rw http.ResponseWriter, req *http.Request) {
+	rw.Write([]byte("OK"))
 }
 
 func (s *Server) checkAuth(rw http.ResponseWriter, req *http.Request) string {
