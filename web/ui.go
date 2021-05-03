@@ -6,8 +6,10 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
 
+	"eaglesong.dev/gunk/ui/src"
 	"github.com/gorilla/mux"
 )
 
@@ -24,15 +26,16 @@ func uiRoutes(r *mux.Router) {
 	if u.Scheme != "" {
 		handler = httputil.NewSingleHostReverseProxy(u)
 	} else {
-		handler = http.FileServer(http.Dir(uiLoc))
+		uiLoc = filepath.Clean(uiLoc)
+		handler = staticServer{Root: uiLoc}
 	}
 	indexHandler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		req.URL.Path = "/"
 		handler.ServeHTTP(rw, req)
 	})
-	r.Handle("/", indexHandler)
-	r.Handle("/mychannels", indexHandler)
-	r.Handle("/watch/{channel}", indexHandler)
+	for _, indexRoute := range src.IndexRoutes() {
+		r.Handle(indexRoute, indexHandler)
+	}
 	r.NotFoundHandler = cacheImmutable(handler)
 
 	// proxy avatars to avoid being blocked by privacy tools

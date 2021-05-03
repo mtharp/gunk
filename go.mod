@@ -18,6 +18,7 @@ require (
 	github.com/pion/sdp/v2 v2.4.0
 	github.com/pion/webrtc/v2 v2.2.26
 	github.com/shopspring/decimal v1.2.0 // indirect
+	github.com/stretchr/testify v1.6.1
 	golang.org/x/crypto v0.0.0-20210415154028-4f45737414dc
 	golang.org/x/oauth2 v0.0.0-20210413134643-5e61552d6c78
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
