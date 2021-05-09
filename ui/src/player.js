@@ -107,6 +107,31 @@ function autoplay (video) {
 //   }
 // }
 
+// test for iOS, which only supports RTC and native HLS
+export function nativeRequired () {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+}
+
+export class NativePlayer {
+  constructor (video, webURL) {
+    autoplay(video);
+    this.video = video;
+    video.src = webURL;
+  }
+
+  destroy () {
+    this.video = null;
+  }
+
+  seekLive () {
+    this.video.play();
+  }
+
+  latencyTo () {
+    return null;
+  }
+}
+
 export class DASHPlayer {
   constructor (video, webURL, lowLatencyMode) {
     autoplay(video);

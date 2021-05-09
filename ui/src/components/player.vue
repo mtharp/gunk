@@ -186,7 +186,12 @@ import {
   BIconSkipForwardFill
 } from "bootstrap-vue";
 
-import { DASHPlayer, RTCPlayer } from "../player.js";
+import {
+  DASHPlayer,
+  RTCPlayer,
+  NativePlayer,
+  nativeRequired
+} from "../player.js";
 
 export default {
   name: "player",
@@ -238,6 +243,8 @@ export default {
     if (this.rtcActive) {
       this.player = new RTCPlayer(video, this.sdpURL);
       this.atTail = true;
+    } else if (nativeRequired()) {
+      this.player = new NativePlayer(video, this.nativeURL);
     } else {
       // if (this.webURL.endsWith(".mpd")) {
       this.player = new DASHPlayer(video, this.webURL, this.lowLatency);
@@ -271,6 +278,9 @@ export default {
     },
     webURL() {
       return this.ch.web_url;
+    },
+    nativeURL() {
+      return this.ch.native_url;
     },
     sdpURL() {
       return "/sdp/" + encodeURIComponent(this.ch.name);

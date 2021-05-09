@@ -114,6 +114,7 @@ func (m *Manager) PopulateLive(infos []*model.ChannelInfo) {
 		} else {
 			info.WebURL = ch.getWeb().Playlist()
 		}
+		info.NativeURL = ch.getWeb().Playlist()
 		info.RTC = atomic.LoadUintptr(&ch.rtc) != 0
 	}
 }

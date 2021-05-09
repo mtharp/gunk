@@ -110,7 +110,7 @@ func (ch *channel) setStream(q, aacq, opusq *pubsub.Queue, workDir string) *hls.
 	}
 	ch.web = &hls.Publisher{
 		WorkDir: workDir,
-		Mode:    hls.ModeSeparateTracks,
+		Mode:    hls.ModeSingleAndSeparate,
 	}
 	ch.stoppedAt = time.Time{}
 	atomic.StoreUintptr(&ch.live, 1)

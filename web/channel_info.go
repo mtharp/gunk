@@ -34,10 +34,13 @@ func (s *Server) populateChannel(info *model.ChannelInfo) {
 	info.LiveURL = liveU.String()
 	if info.WebURL != "" {
 		webU, _ := s.router.Get("web").URL("channel", info.Name, "filename", info.WebURL)
+		nativeU, _ := s.router.Get("web").URL("channel", info.Name, "filename", info.NativeURL)
 		if s.HLSBase != nil {
 			webU = s.HLSBase.ResolveReference(webU)
+			nativeU = s.HLSBase.ResolveReference(nativeU)
 		}
 		info.WebURL = webU.String()
+		info.NativeURL = nativeU.String()
 	}
 }
 

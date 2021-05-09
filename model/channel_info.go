@@ -3,15 +3,16 @@ package model
 import "time"
 
 type ChannelInfo struct {
-	Name    string `json:"name"`
-	Live    bool   `json:"live"`
-	Last    int64  `json:"last"`
-	Thumb   string `json:"thumb"`
-	LiveURL string `json:"live_url"`
-	WebURL  string `json:"web_url"`
-	PubID   string `json:"pub_id"`
-	Viewers int    `json:"viewers"`
-	RTC     bool   `json:"rtc"`
+	Name      string `json:"name"`
+	Live      bool   `json:"live"`
+	Last      int64  `json:"last"`
+	Thumb     string `json:"thumb"`
+	LiveURL   string `json:"live_url"`
+	WebURL    string `json:"web_url"`
+	NativeURL string `json:"native_url"`
+	PubID     string `json:"pub_id"`
+	Viewers   int    `json:"viewers"`
+	RTC       bool   `json:"rtc"`
 }
 
 func ListChannelInfo() (ret []*ChannelInfo, err error) {
