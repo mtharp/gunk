@@ -3,7 +3,6 @@ package playrtc
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -71,7 +70,7 @@ func (s *senderTrack) Bind(t webrtc.TrackLocalContext) (webrtc.RTPCodecParameter
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	log.Println("bound", codec.PayloadType, codec.MimeType, codec.SDPFmtpLine)
+	// log.Println("bound", codec.PayloadType, codec.MimeType, codec.SDPFmtpLine)
 	if s.packetizer != nil {
 		return codec, nil
 	}

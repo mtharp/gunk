@@ -2,8 +2,8 @@ package web
 
 import (
 	"errors"
+	"sync"
 
-	"eaglesong.dev/gunk/sinks/playrtc"
 	"github.com/pion/webrtc/v3"
 )
 
@@ -15,15 +15,25 @@ func (n *wsSession) Play(name, remoteIP string) error {
 		n.rtc.Close()
 		n.rtc = nil
 	}
-	var p playrtc.PlayRequest
-	p.Remote = remoteIP
-	p.SendCandidate = func(cand webrtc.ICECandidateInit) {
-		n.send <- wsMsg{
+	// candidates can arrive before the offer is even sent, queue them up to
+	// always deliver the offer first
+	var mu sync.Mutex
+	var sent bool
+	var saved []wsMsg
+	cand := func(cand webrtc.ICECandidateInit) {
+		m := wsMsg{
 			Type:      "candidate",
 			Candidate: &cand,
 		}
+		mu.Lock()
+		if sent {
+			n.send <- m
+		} else {
+			saved = append(saved, m)
+		}
+		mu.Unlock()
 	}
-	s, err := n.server.Channels.OfferSDP(p, name)
+	s, err := n.server.Channels.OfferSDP(name, remoteIP, cand)
 	if err != nil {
 		return err
 	}
@@ -33,6 +43,13 @@ func (n *wsSession) Play(name, remoteIP string) error {
 		SDP:  &offer,
 	}
 	n.rtc = s
+	mu.Lock()
+	sent = true
+	for _, m := range saved {
+		n.send <- m
+	}
+	saved = nil
+	mu.Unlock()
 	return nil
 }
 

@@ -1,138 +1,110 @@
 package playrtc
 
 import (
-	"errors"
+	"context"
 	"fmt"
-	"io"
 	"log"
-	"sync/atomic"
+	"net"
+	"strconv"
+	"strings"
 	"time"
 
-	"github.com/nareix/joy4/av"
+	"github.com/pion/ice/v2"
 	"github.com/pion/webrtc/v3"
 )
 
-var rtcConf = webrtc.Configuration{
-	ICEServers: []webrtc.ICEServer{{
-		URLs: []string{
-			"stun:stun1.l.google.com:19302",
-			"stun:stun2.l.google.com:19302",
-		},
-	}},
+type Engine struct {
+	AdvertiseHost string
+
+	resolver *net.Resolver
+	media    *webrtc.MediaEngine
+	mux      ice.UDPMux
+	conf     webrtc.Configuration
 }
 
-var api *webrtc.API
-
-func init() {
+func NewEngine(advertiseHost string) (*Engine, error) {
 	m := new(webrtc.MediaEngine)
 	if err := m.RegisterDefaultCodecs(); err != nil {
-		panic(err)
-	}
-	var se webrtc.SettingEngine
-	// TODO: SetNAT1To1IPs
-	se.SetNetworkTypes([]webrtc.NetworkType{webrtc.NetworkTypeUDP4})
-	api = webrtc.NewAPI(webrtc.WithMediaEngine(m), webrtc.WithSettingEngine(se))
-}
-
-type PlayRequest struct {
-	Remote        string
-	Source        func() av.Demuxer
-	AddViewer     func(int)
-	SendCandidate func(webrtc.ICECandidateInit)
-}
-
-type Sender struct {
-	pc     *webrtc.PeerConnection
-	state  uintptr
-	tracks []*senderTrack
-	req    PlayRequest
-	sdp    webrtc.SessionDescription
-}
-
-func (p PlayRequest) newSender(streams []av.CodecData) (*Sender, error) {
-	pc, err := api.NewPeerConnection(rtcConf)
-	if err != nil {
 		return nil, err
 	}
-	s := &Sender{
-		pc:     pc,
-		tracks: make([]*senderTrack, len(streams)),
-		req:    p,
+	e := &Engine{
+		media: m,
+		conf: webrtc.Configuration{
+			ICEServers: []webrtc.ICEServer{{
+				URLs: []string{
+					"stun:stun1.l.google.com:19302",
+					"stun:stun2.l.google.com:19302",
+				},
+			}},
+		},
 	}
-	pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
-		log.Printf("[rtc] %s connection state: %s", s.req.Remote, state)
-		atomic.StoreUintptr(&s.state, uintptr(state))
-	})
-	pc.OnICECandidate(func(candidate *webrtc.ICECandidate) {
-		if candidate != nil && s.req.SendCandidate != nil {
-			c := candidate.ToJSON()
-			log.Println("sending candidate:", c.Candidate)
-			s.req.SendCandidate(c)
-		}
-	})
-	sconf := webrtc.RTPTransceiverInit{Direction: webrtc.RTPTransceiverDirectionSendonly}
-	for i, stream := range streams {
-		track, err := newSenderTrack(stream)
-		if err != nil {
-			pc.Close()
-			return nil, err
-		}
-		if _, err := pc.AddTransceiverFromTrack(track, sconf); err != nil {
-			pc.Close()
-			return nil, err
-		}
-		s.tracks[i] = track
-	}
-	return s, nil
-}
-
-func (s *Sender) Close() {
-	s.pc.Close()
-}
-
-func (s *Sender) serve() {
-	if err := s.serveOnce(); err != nil {
-		log.Printf("error: serving rtc to %s: %s", s.req.Remote, err)
-	}
-}
-
-func (s *Sender) getState() webrtc.ICEConnectionState {
-	return webrtc.ICEConnectionState(atomic.LoadUintptr(&s.state))
-}
-
-func (s *Sender) serveOnce() error {
-	s.req.AddViewer(1)
-	defer s.req.AddViewer(-1)
-	defer s.pc.Close()
-	q := s.req.Source()
-	if q == nil {
-		return errors.New("channel is gone")
-	}
-	const rtcTimeout = time.Minute
-	deadline := time.Now().Add(rtcTimeout)
-	for {
-		packet, err := q.ReadPacket()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return fmt.Errorf("read error: %s", err)
-		}
-		track := s.tracks[int(packet.Idx)]
-		if track == nil {
-			continue
-		}
-		// check if RTC is still connected
-		switch s.getState() {
-		case webrtc.ICEConnectionStateConnected:
-			_ = track.WritePacket(packet)
-			deadline = time.Now().Add(rtcTimeout)
-		case webrtc.ICEConnectionStateClosed:
-			return nil
-		default:
-			if time.Now().After(deadline) {
-				return fmt.Errorf("webrtc connection failed: %s", s.getState())
+	if advertiseHost != "" {
+		i := strings.IndexByte(advertiseHost, ':')
+		if i > 0 {
+			// bind a single port for ICE
+			port, err := strconv.ParseUint(advertiseHost[i+1:], 10, 16)
+			if err != nil {
+				return nil, fmt.Errorf("RTC host %s has invalid port: %w", advertiseHost, err)
 			}
+			conn, err := net.ListenUDP("udp", &net.UDPAddr{Port: int(port)})
+			if err != nil {
+				return nil, fmt.Errorf("listening on RTC host: %w", err)
+			}
+			e.mux = webrtc.NewICEUDPMux(nil, conn)
+			advertiseHost = advertiseHost[:i]
+		}
+		e.AdvertiseHost = advertiseHost
+		// test that the hostname exists. it will be re-resolved each time a
+		// connection is started.
+		resolver := &net.Resolver{PreferGo: true}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		ips, err := e.resolver.LookupHost(ctx, advertiseHost)
+		if err != nil || len(ips) == 0 {
+			return nil, fmt.Errorf("looking up RTC host %s: %w", advertiseHost, err)
+		}
+		e.resolver = resolver
+	}
+	return e, nil
+}
+
+func (e *Engine) newConnection() (*webrtc.PeerConnection, error) {
+	var se webrtc.SettingEngine
+	types := []webrtc.NetworkType{webrtc.NetworkTypeUDP4}
+	if e.AdvertiseHost != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		ips, err := e.resolver.LookupHost(ctx, e.AdvertiseHost)
+		if err == nil && len(ips) > 0 {
+			se.SetNAT1To1IPs(ips, webrtc.ICECandidateTypeHost)
+			var hasV4, hasV6 bool
+			for _, ip := range ips {
+				if strings.ContainsRune(ip, ':') {
+					hasV6 = true
+				} else {
+					hasV4 = true
+				}
+			}
+			types = nil
+			if hasV4 {
+				types = append(types, webrtc.NetworkTypeUDP4)
+			}
+			if hasV6 {
+				types = append(types, webrtc.NetworkTypeUDP6)
+			}
+		} else {
+			log.Printf("warning: looking up RTC host %s: %+v", e.AdvertiseHost, err)
 		}
 	}
-	return nil
+	se.SetNetworkTypes(types)
+	se.SetICEMulticastDNSMode(ice.MulticastDNSModeDisabled)
+	conf := e.conf
+	if e.mux != nil {
+		se.SetICEUDPMux(e.mux)
+		// disable STUN when bound to a known port
+		se.SetLite(true)
+		conf.ICEServers = nil
+	}
+	api := webrtc.NewAPI(webrtc.WithMediaEngine(e.media), webrtc.WithSettingEngine(se))
+	return api.NewPeerConnection(conf)
 }

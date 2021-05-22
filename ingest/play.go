@@ -55,14 +55,17 @@ func (m *Manager) ServeWeb(rw http.ResponseWriter, req *http.Request, name strin
 	return nil
 }
 
-func (m *Manager) OfferSDP(r playrtc.PlayRequest, name string) (*playrtc.Sender, error) {
+func (m *Manager) OfferSDP(name, remoteIP string, sendCandidate playrtc.CandidateSender) (*playrtc.Sender, error) {
 	ch := m.channel(name)
 	if ch == nil {
 		return nil, ErrNoChannel
 	}
-	r.Source = func() av.Demuxer { return ch.queue(true) }
-	r.AddViewer = func(delta int) { ch.addViewer(int32(delta)) }
-	return r.OfferToSend()
+	src := ch.queue(true)
+	if src == nil {
+		return nil, ErrNoChannel
+	}
+	addViewer := func(delta int) { ch.addViewer(int32(delta)) }
+	return m.rtc.OfferToSend(src, addViewer, remoteIP, sendCandidate)
 }
 
 func (m *Manager) PopulateLive(infos []*model.ChannelInfo) {

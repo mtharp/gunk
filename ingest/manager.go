@@ -8,6 +8,7 @@ import (
 	"eaglesong.dev/gunk/ingest/ftl"
 	"eaglesong.dev/gunk/model"
 	"eaglesong.dev/gunk/sinks/grabber"
+	"eaglesong.dev/gunk/sinks/playrtc"
 	"eaglesong.dev/hls"
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/av/pubsub"
@@ -23,12 +24,17 @@ type Manager struct {
 	FTL          ftl.Server
 	WorkDir      string
 	UseDASH      bool
+	RTCHost      string
 
 	channels sync.Map
+	rtc      *playrtc.Engine
 }
 
-func (m *Manager) Initialize() {
+func (m *Manager) Initialize() error {
 	m.FTL.Publish = m.Publish
+	var err error
+	m.rtc, err = playrtc.NewEngine(m.RTCHost)
+	return err
 }
 
 type channel struct {

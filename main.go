@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"eaglesong.dev/gunk/ingest"
 	"eaglesong.dev/gunk/ingest/irtmp"
 	"eaglesong.dev/gunk/model"
 	"eaglesong.dev/gunk/web"
@@ -31,8 +32,10 @@ func main() {
 	s := &web.Server{
 		BaseURL: base,
 		Secure:  u.Scheme == "https",
+		Channels: ingest.Manager{
+			RTCHost: os.Getenv("RTC_HOST"),
+		},
 	}
-	s.Initialize()
 	s.SetOauth(os.Getenv("CLIENT_ID"), os.Getenv("CLIENT_SECRET"))
 	if k := os.Getenv("COOKIE_SECRET"); k == "" {
 		log.Fatalln("error: COOKIE_SECRET must be set")
@@ -76,6 +79,10 @@ func main() {
 	if err := model.Connect(); err != nil {
 		log.Fatalln("error: connecting to database:", err)
 	}
+	if err := s.Initialize(); err != nil {
+		log.Fatalln("error:", err)
+	}
+
 	if v := os.Getenv("METRICS"); v != "" {
 		lis, err := net.Listen("tcp", v)
 		if err != nil {

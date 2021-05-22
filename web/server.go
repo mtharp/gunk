@@ -34,13 +34,16 @@ type Server struct {
 	Channels ingest.Manager
 }
 
-func (s *Server) Initialize() {
+func (s *Server) Initialize() error {
 	s.Channels.PublishEvent = s.PublishEvent
 	s.Channels.FTL.CheckUser = model.VerifyFTL
 	s.Channels.FTL.Publish = s.Channels.Publish
-	s.Channels.Initialize()
+	if err := s.Channels.Initialize(); err != nil {
+		return err
+	}
 	s.sessions = make(map[string]*wsSession)
 	go s.checkSessions()
+	return nil
 }
 
 func (s *Server) Handler() http.Handler {
