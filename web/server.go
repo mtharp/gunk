@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"sync"
 
 	"eaglesong.dev/gunk/ingest"
 	"eaglesong.dev/gunk/model"
@@ -27,6 +28,9 @@ type Server struct {
 	webhookURL string
 	checkGuild string
 
+	smu      sync.Mutex
+	sessions map[string]*wsSession
+
 	Channels ingest.Manager
 }
 
@@ -35,6 +39,8 @@ func (s *Server) Initialize() {
 	s.Channels.FTL.CheckUser = model.VerifyFTL
 	s.Channels.FTL.Publish = s.Channels.Publish
 	s.Channels.Initialize()
+	s.sessions = make(map[string]*wsSession)
+	go s.checkSessions()
 }
 
 func (s *Server) Handler() http.Handler {

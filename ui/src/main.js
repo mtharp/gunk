@@ -23,7 +23,6 @@ new Vue({
     return {
       channels: {},
       recentChannels: [],
-      serverTimeBase: null,
       rtcSelected: localStorage.getItem('playerType') === 'RTC',
       lowLatency: localStorage.getItem('lowLatency') !== 'false',
       user: {
@@ -40,8 +39,12 @@ new Vue({
         .then(response => {
           this.channels = response.data.channels;
           this.recentChannels = response.data.recent;
-          this.serverTimeBase = response.data.time - performance.now();
         });
+    },
+    updateChannel (ch) {
+      const newch = Object.assign({}, this.channels);
+      newch[ch.name] = ch;
+      this.channels = newch;
     },
     updateUser () {
       axios.get('/oauth2/user')
@@ -59,12 +62,6 @@ new Vue({
     },
     navChannel (name) {
       return { name: 'watch', params: { channel: name } };
-    },
-    serverTime () {
-      if (this.serverTimeBase === null) {
-        return null;
-      }
-      return this.serverTimeBase + performance.now();
     }
   },
   computed: {
@@ -90,13 +87,14 @@ new Vue({
   mounted () {
     this.updateChannels();
     this.updateUser();
-    this.chinterval = window.setInterval(this.updateChannels, 5000);
+    // this.chinterval = window.setInterval(this.updateChannels, 5000);
     this.userinterval = window.setInterval(this.updateUser, 300000);
     this.ws = new WSSession(location);
+    this.ws.onChannel = (ch) => this.updateChannel(ch);
   },
   beforeDestroy () {
     this.ws.close();
-    window.clearInterval(this.chinterval);
+    // window.clearInterval(this.chinterval);
     window.clearInterval(this.userinterval);
   }
 }).$mount('#app');

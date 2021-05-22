@@ -12,12 +12,15 @@ import (
 	"github.com/jackc/pgx"
 )
 
-func (s *Server) listChannels() ([]*model.ChannelInfo, error) {
+func (s *Server) listChannels(m channelMarkers) ([]*model.ChannelInfo, error) {
 	infos, err := model.ListChannelInfo()
 	if err != nil {
 		return nil, err
 	}
 	s.Channels.PopulateLive(infos)
+	if m != nil {
+		infos = m.Filter(infos)
+	}
 	for _, info := range infos {
 		s.populateChannel(info)
 	}
@@ -45,7 +48,7 @@ func (s *Server) populateChannel(info *model.ChannelInfo) {
 }
 
 func (s *Server) viewChannelInfo(rw http.ResponseWriter, req *http.Request) {
-	infos, err := s.listChannels()
+	infos, err := s.listChannels(nil)
 	if err != nil {
 		log.Printf("error: listing channels: %s", err)
 		http.Error(rw, "", 500)

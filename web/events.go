@@ -15,12 +15,17 @@ func (s *Server) PublishEvent(auth model.ChannelAuth, live bool, thumb grabber.R
 			}
 		}()
 	}
-	if !live || !thumb.Time.IsZero() {
-		ch := &model.ChannelInfo{
-			Name: auth.Name,
-			Live: live,
-			Last: thumb.Time.UnixNano() / 1000000,
+}
+
+type channelMarkers map[string]*model.ChannelInfo
+
+func (m channelMarkers) Filter(infos []*model.ChannelInfo) (ret []*model.ChannelInfo) {
+	for _, ch := range infos {
+		if ch.Equal(m[ch.Name]) {
+			continue
 		}
-		s.populateChannel(ch)
+		ret = append(ret, ch)
+		m[ch.Name] = ch
 	}
+	return
 }

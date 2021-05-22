@@ -33,3 +33,14 @@ func ListChannelInfo() (ret []*ChannelInfo, err error) {
 	err = rows.Err()
 	return
 }
+
+func (i *ChannelInfo) Equal(j *ChannelInfo) bool {
+	if (i == nil) != (j == nil) {
+		return false
+	}
+	return i.Name == j.Name &&
+		i.Live == j.Live &&
+		i.Last == j.Last &&
+		i.Viewers == j.Viewers &&
+		i.RTC == j.RTC
+}
