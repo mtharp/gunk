@@ -6,12 +6,10 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"strings"
 	"sync/atomic"
 
 	"eaglesong.dev/gunk/model"
 	"eaglesong.dev/gunk/sinks/playrtc"
-	"eaglesong.dev/gunk/sinks/rtsp"
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/format/ts"
 )
@@ -67,39 +65,25 @@ func (m *Manager) ServeSDP(rw http.ResponseWriter, req *http.Request, name strin
 	return playrtc.HandleSDP(rw, req, src, addV)
 }
 
-func (m *Manager) AnswerSDP(o playrtc.OfferToReceive, name string) (*playrtc.Sender, error) {
-	ch := m.channel(name)
-	if ch == nil {
-		return nil, ErrNoChannel
-	}
-	o.Source = func() av.Demuxer { return ch.queue(true) }
-	o.AddViewer = func(delta int) { ch.addViewer(int32(delta)) }
-	return o.Answer()
-}
+// func (m *Manager) AnswerSDP(o playrtc.OfferToReceive, name string) (*playrtc.Sender, error) {
+// 	ch := m.channel(name)
+// 	if ch == nil {
+// 		return nil, ErrNoChannel
+// 	}
+// 	o.Source = func() av.Demuxer { return ch.queue(true) }
+// 	o.AddViewer = func(delta int) { ch.addViewer(int32(delta)) }
+// 	return o.Answer()
+// }
 
-func (m *Manager) OfferSDP(r playrtc.PlayRequest, name string) (*playrtc.Sender, error) {
-	ch := m.channel(name)
-	if ch == nil {
-		return nil, ErrNoChannel
-	}
-	r.Source = func() av.Demuxer { return ch.queue(true) }
-	r.AddViewer = func(delta int) { ch.addViewer(int32(delta)) }
-	return r.OfferToSend()
-}
-
-func (m *Manager) GetRTSPSource(req *rtsp.Request) (av.Demuxer, error) {
-	chname := req.URL.Path
-	if strings.HasPrefix(chname, "/") {
-		chname = chname[1:]
-	}
-	chname = strings.Split(chname, "/")[0]
-	src := m.channel(chname).queue(true)
-	if src == nil {
-		return nil, rtsp.ErrNotFound
-	}
-	// TODO: viewer count
-	return src, nil
-}
+// func (m *Manager) OfferSDP(r playrtc.PlayRequest, name string) (*playrtc.Sender, error) {
+// 	ch := m.channel(name)
+// 	if ch == nil {
+// 		return nil, ErrNoChannel
+// 	}
+// 	r.Source = func() av.Demuxer { return ch.queue(true) }
+// 	r.AddViewer = func(delta int) { ch.addViewer(int32(delta)) }
+// 	return r.OfferToSend()
+// }
 
 func (m *Manager) PopulateLive(infos []*model.ChannelInfo) {
 	for _, info := range infos {

@@ -40,7 +40,7 @@ func (s *Server) Initialize() {
 func (s *Server) Handler() http.Handler {
 	r := mux.NewRouter()
 	s.router = r
-	r.HandleFunc("/ws", s.serveWS)
+	// r.HandleFunc("/ws", s.serveWS)
 	// video
 	r.HandleFunc("/live/{channel}.ts", corsOK(s.viewPlayTS)).Methods("GET", "OPTIONS").Name("live")
 	r.HandleFunc("/live/{channel}.ts", s.viewPublishTS).Methods("PUT", "POST")

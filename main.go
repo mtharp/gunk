@@ -13,7 +13,6 @@ import (
 
 	"eaglesong.dev/gunk/ingest/irtmp"
 	"eaglesong.dev/gunk/model"
-	"eaglesong.dev/gunk/sinks/rtsp"
 	"eaglesong.dev/gunk/web"
 	"github.com/nareix/joy4/format/rtmp"
 	"golang.org/x/sync/errgroup"
@@ -94,11 +93,6 @@ func main() {
 		Publish:   s.Channels.Publish,
 	}
 	eg.Go(func() error { return rs.ListenAndServe() })
-	rtsps := &rtsp.Server{Source: s.Channels.GetRTSPSource}
-	if err := rtsps.Listen(os.Getenv("LISTEN_RTSP")); err != nil {
-		log.Fatalln("error:", err)
-	}
-	eg.Go(func() error { return rtsps.Serve() })
 	if err := s.Channels.FTL.Listen(os.Getenv("LISTEN_FTL")); err != nil {
 		log.Fatalln("error:", err)
 	}

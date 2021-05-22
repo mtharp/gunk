@@ -7,12 +7,11 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"math/rand"
 	"net/http"
+	"strings"
 
-	"eaglesong.dev/gunk/sinks/rtsp"
 	"github.com/nareix/joy4/av"
-	"github.com/pion/webrtc/v2"
+	"github.com/pion/webrtc/v3"
 )
 
 var rtcConf = webrtc.Configuration{
@@ -24,6 +23,19 @@ var rtcConf = webrtc.Configuration{
 	}},
 }
 
+var api *webrtc.API
+
+func init() {
+	m := new(webrtc.MediaEngine)
+	if err := m.RegisterDefaultCodecs(); err != nil {
+		panic(err)
+	}
+	var se webrtc.SettingEngine
+	// TODO: SetNAT1To1IPs
+	se.SetNetworkTypes([]webrtc.NetworkType{webrtc.NetworkTypeUDP4})
+	api = webrtc.NewAPI(webrtc.WithMediaEngine(m), webrtc.WithSettingEngine(se))
+}
+
 type PlayRequest struct {
 	Remote        string
 	Source        func() av.Demuxer
@@ -33,30 +45,10 @@ type PlayRequest struct {
 }
 
 type Sender struct {
-	media  webrtc.MediaEngine
 	pc     *webrtc.PeerConnection
 	state  chan webrtc.ICEConnectionState
-	tracks []*rtsp.TrackFramer
+	tracks []*senderTrack
 	req    PlayRequest
-	sdp    webrtc.SessionDescription
-}
-
-func (p PlayRequest) newSender(media webrtc.MediaEngine, tracks int, trickle bool) (*Sender, error) {
-	var se webrtc.SettingEngine
-	se.SetTrickle(trickle)
-	api := webrtc.NewAPI(webrtc.WithMediaEngine(media), webrtc.WithSettingEngine(se))
-	peerConnection, err := api.NewPeerConnection(rtcConf)
-	if err != nil {
-		return nil, err
-	}
-	s := &Sender{
-		media:  media,
-		pc:     peerConnection,
-		state:  make(chan webrtc.ICEConnectionState, 1),
-		tracks: make([]*rtsp.TrackFramer, tracks),
-		req:    p,
-	}
-	return s, nil
 }
 
 func HandleSDP(rw http.ResponseWriter, req *http.Request, src func() av.Demuxer, addViewer func(int)) error {
@@ -70,14 +62,13 @@ func HandleSDP(rw http.ResponseWriter, req *http.Request, src func() av.Demuxer,
 		http.Error(rw, "invalid offer", 400)
 		return nil
 	}
+	for _, line := range strings.Split(offer.SDP, "\n") {
+		fmt.Println("<", line)
+	}
 	// build tracks
 	streams, err := src().Streams()
 	if err != nil {
 		return err
-	}
-	var m webrtc.MediaEngine
-	if err := m.PopulateFromSDP(offer); err != nil {
-		return fmt.Errorf("populate from SDP: %w", err)
 	}
 	gatherDone := make(chan struct{})
 	pr := PlayRequest{
@@ -86,13 +77,8 @@ func HandleSDP(rw http.ResponseWriter, req *http.Request, src func() av.Demuxer,
 		Remote:     req.RemoteAddr,
 		GatherDone: func() { close(gatherDone) },
 	}
-	s, err := pr.newSender(m, len(streams), false)
+	s, err := pr.newSender(streams, offer)
 	if err != nil {
-		return err
-	}
-	direction := chooseDirection(offer)
-	if err := s.setupTracks(streams, direction); err != nil {
-		s.Close()
 		return err
 	}
 	// build answer
@@ -111,6 +97,9 @@ func HandleSDP(rw http.ResponseWriter, req *http.Request, src func() av.Demuxer,
 	}
 	<-gatherDone
 	sdp := s.pc.LocalDescription()
+	for _, line := range strings.Split(sdp.SDP, "\n") {
+		fmt.Println(">", line)
+	}
 	blob, err = json.Marshal(sdp)
 	if err != nil {
 		s.Close()
@@ -122,12 +111,22 @@ func HandleSDP(rw http.ResponseWriter, req *http.Request, src func() av.Demuxer,
 	return nil
 }
 
-func (s *Sender) setupTracks(streams []av.CodecData, direction webrtc.RTPTransceiverDirection) error {
-	s.pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
+func (p PlayRequest) newSender(streams []av.CodecData, offer webrtc.SessionDescription) (*Sender, error) {
+	pc, err := api.NewPeerConnection(rtcConf)
+	if err != nil {
+		return nil, err
+	}
+	s := &Sender{
+		pc:     pc,
+		state:  make(chan webrtc.ICEConnectionState, 1),
+		tracks: make([]*senderTrack, len(streams)),
+		req:    p,
+	}
+	pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
 		log.Printf("[rtc] %s connection state: %s", s.req.Remote, state)
 		s.state <- state
 	})
-	s.pc.OnICECandidate(func(candidate *webrtc.ICECandidate) {
+	pc.OnICECandidate(func(candidate *webrtc.ICECandidate) {
 		if candidate == nil && s.req.GatherDone != nil {
 			s.req.GatherDone()
 		} else if candidate != nil && s.req.SendCandidate != nil {
@@ -136,37 +135,24 @@ func (s *Sender) setupTracks(streams []av.CodecData, direction webrtc.RTPTransce
 			s.req.SendCandidate(c)
 		}
 	})
-	sconf := webrtc.RtpTransceiverInit{Direction: direction}
-	ssrc := rand.Uint32()
+	direction := webrtc.RTPTransceiverDirectionSendonly
+	if offer.SDP != "" {
+		direction = chooseDirection(offer)
+	}
+	sconf := webrtc.RTPTransceiverInit{Direction: direction}
 	for i, stream := range streams {
-		codec := s.findCodec(stream)
-		if codec == nil {
-			return fmt.Errorf("unsupported codec %s for RTSP", stream.Type())
-		}
-		track, err := s.pc.NewTrack(codec.PayloadType, ssrc, randSeq(), randSeq())
+		track, err := newSenderTrack(stream)
 		if err != nil {
-			return err
+			pc.Close()
+			return nil, err
 		}
-		if _, err := s.pc.AddTransceiverFromTrack(track, sconf); err != nil {
-			return err
+		if _, err := pc.AddTransceiverFromTrack(track, sconf); err != nil {
+			pc.Close()
+			return nil, err
 		}
-		s.tracks[i] = &rtsp.TrackFramer{
-			CodecData: stream,
-			Codec:     codec,
-			Track:     track,
-		}
-		ssrc++
+		s.tracks[i] = track
 	}
-	return nil
-}
-
-func randSeq() string {
-	letters := []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	b := make([]byte, 16)
-	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
-	}
-	return string(b)
+	return s, nil
 }
 
 func (s *Sender) Close() {
