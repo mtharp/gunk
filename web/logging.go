@@ -1,7 +1,10 @@
 package web
 
 import (
+	"bufio"
+	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"time"
 )
@@ -42,4 +45,12 @@ func (lw *loggingWriter) Write(d []byte) (n int, err error) {
 		lw.length += int64(n)
 	}
 	return
+}
+
+func (lw *loggingWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	h, ok := lw.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, fmt.Errorf("can't hijack %T", lw.ResponseWriter)
+	}
+	return h.Hijack()
 }

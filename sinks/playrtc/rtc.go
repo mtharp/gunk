@@ -1,14 +1,12 @@
 package playrtc
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
-	"net/http"
-	"strings"
+	"sync/atomic"
+	"time"
 
 	"github.com/nareix/joy4/av"
 	"github.com/pion/webrtc/v3"
@@ -41,105 +39,38 @@ type PlayRequest struct {
 	Source        func() av.Demuxer
 	AddViewer     func(int)
 	SendCandidate func(webrtc.ICECandidateInit)
-	GatherDone    func()
 }
 
 type Sender struct {
 	pc     *webrtc.PeerConnection
-	state  chan webrtc.ICEConnectionState
+	state  uintptr
 	tracks []*senderTrack
 	req    PlayRequest
+	sdp    webrtc.SessionDescription
 }
 
-func HandleSDP(rw http.ResponseWriter, req *http.Request, src func() av.Demuxer, addViewer func(int)) error {
-	// parse offer
-	blob, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		return err
-	}
-	var offer webrtc.SessionDescription
-	if err := json.Unmarshal(blob, &offer); err != nil {
-		http.Error(rw, "invalid offer", 400)
-		return nil
-	}
-	for _, line := range strings.Split(offer.SDP, "\n") {
-		fmt.Println("<", line)
-	}
-	// build tracks
-	streams, err := src().Streams()
-	if err != nil {
-		return err
-	}
-	gatherDone := make(chan struct{})
-	pr := PlayRequest{
-		Source:     src,
-		AddViewer:  addViewer,
-		Remote:     req.RemoteAddr,
-		GatherDone: func() { close(gatherDone) },
-	}
-	s, err := pr.newSender(streams, offer)
-	if err != nil {
-		return err
-	}
-	// build answer
-	if err := s.pc.SetRemoteDescription(offer); err != nil {
-		s.Close()
-		return err
-	}
-	answer, err := s.pc.CreateAnswer(nil)
-	if err != nil {
-		s.Close()
-		return err
-	}
-	if err := s.pc.SetLocalDescription(answer); err != nil {
-		s.Close()
-		return err
-	}
-	<-gatherDone
-	sdp := s.pc.LocalDescription()
-	for _, line := range strings.Split(sdp.SDP, "\n") {
-		fmt.Println(">", line)
-	}
-	blob, err = json.Marshal(sdp)
-	if err != nil {
-		s.Close()
-		return err
-	}
-	rw.Write(blob)
-	// serve in background
-	go s.serve()
-	return nil
-}
-
-func (p PlayRequest) newSender(streams []av.CodecData, offer webrtc.SessionDescription) (*Sender, error) {
+func (p PlayRequest) newSender(streams []av.CodecData) (*Sender, error) {
 	pc, err := api.NewPeerConnection(rtcConf)
 	if err != nil {
 		return nil, err
 	}
 	s := &Sender{
 		pc:     pc,
-		state:  make(chan webrtc.ICEConnectionState, 1),
 		tracks: make([]*senderTrack, len(streams)),
 		req:    p,
 	}
 	pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
 		log.Printf("[rtc] %s connection state: %s", s.req.Remote, state)
-		s.state <- state
+		atomic.StoreUintptr(&s.state, uintptr(state))
 	})
 	pc.OnICECandidate(func(candidate *webrtc.ICECandidate) {
-		if candidate == nil && s.req.GatherDone != nil {
-			s.req.GatherDone()
-		} else if candidate != nil && s.req.SendCandidate != nil {
+		if candidate != nil && s.req.SendCandidate != nil {
 			c := candidate.ToJSON()
 			log.Println("sending candidate:", c.Candidate)
 			s.req.SendCandidate(c)
 		}
 	})
-	direction := webrtc.RTPTransceiverDirectionSendonly
-	if offer.SDP != "" {
-		direction = chooseDirection(offer)
-	}
-	sconf := webrtc.RTPTransceiverInit{Direction: direction}
+	sconf := webrtc.RTPTransceiverInit{Direction: webrtc.RTPTransceiverDirectionSendonly}
 	for i, stream := range streams {
 		track, err := newSenderTrack(stream)
 		if err != nil {
@@ -165,6 +96,10 @@ func (s *Sender) serve() {
 	}
 }
 
+func (s *Sender) getState() webrtc.ICEConnectionState {
+	return webrtc.ICEConnectionState(atomic.LoadUintptr(&s.state))
+}
+
 func (s *Sender) serveOnce() error {
 	s.req.AddViewer(1)
 	defer s.req.AddViewer(-1)
@@ -173,23 +108,9 @@ func (s *Sender) serveOnce() error {
 	if q == nil {
 		return errors.New("channel is gone")
 	}
-	for st := range s.state {
-		if st == webrtc.ICEConnectionStateConnected {
-			break
-		} else if st > webrtc.ICEConnectionStateConnected {
-			return fmt.Errorf("webrtc connection failed: state is %s", st)
-		}
-	}
+	const rtcTimeout = time.Minute
+	deadline := time.Now().Add(rtcTimeout)
 	for {
-		// check if still connected
-		select {
-		case st := <-s.state:
-			if st != webrtc.ICEConnectionStateConnected {
-				return nil
-			}
-		default:
-		}
-
 		packet, err := q.ReadPacket()
 		if err == io.EOF {
 			break
@@ -200,7 +121,18 @@ func (s *Sender) serveOnce() error {
 		if track == nil {
 			continue
 		}
-		_ = track.WritePacket(packet)
+		// check if RTC is still connected
+		switch s.getState() {
+		case webrtc.ICEConnectionStateConnected:
+			_ = track.WritePacket(packet)
+			deadline = time.Now().Add(rtcTimeout)
+		case webrtc.ICEConnectionStateClosed:
+			return nil
+		default:
+			if time.Now().After(deadline) {
+				return fmt.Errorf("webrtc connection failed: %s", s.getState())
+			}
+		}
 	}
 	return nil
 }

@@ -6,38 +6,8 @@ import (
 	"github.com/pion/webrtc/v3"
 )
 
-type OfferToReceive struct {
-	PlayRequest
-	Offer webrtc.SessionDescription
-}
-
-func (o OfferToReceive) Answer() (*Sender, error) {
-	// build tracks
-	streams, err := o.Source().Streams()
-	if err != nil {
-		return nil, err
-	}
-	s, err := o.PlayRequest.newSender(streams, o.Offer)
-	if err != nil {
-		return nil, err
-	}
-	// build answer
-	if err := s.pc.SetRemoteDescription(o.Offer); err != nil {
-		s.Close()
-		return nil, err
-	}
-	answer, err := s.pc.CreateAnswer(nil)
-	if err != nil {
-		s.Close()
-		return nil, err
-	}
-	if err := s.pc.SetLocalDescription(answer); err != nil {
-		s.Close()
-		return nil, err
-	}
-	// serve in background
-	go s.serve()
-	return s, nil
+func (s *Sender) SDP() webrtc.SessionDescription {
+	return s.sdp
 }
 
 func (s *Sender) Candidate(candidate webrtc.ICECandidateInit) {
@@ -51,11 +21,11 @@ func (p PlayRequest) OfferToSend() (*Sender, error) {
 	if err != nil {
 		return nil, err
 	}
-	s, err := p.newSender(streams, webrtc.SessionDescription{})
+	s, err := p.newSender(streams)
 	if err != nil {
 		return nil, err
 	}
-	offer, err := s.pc.CreateOffer(nil)
+	offer, err := s.pc.CreateOffer(nil) //&webrtc.OfferOptions{ICERestart: true})
 	if err != nil {
 		s.Close()
 		return nil, err
@@ -64,6 +34,7 @@ func (p PlayRequest) OfferToSend() (*Sender, error) {
 		s.Close()
 		return nil, err
 	}
+	s.sdp = offer
 	return s, nil
 }
 

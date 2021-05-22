@@ -3,6 +3,7 @@ import App from './app.vue';
 import router from './router';
 import ControlsHider from './components/controls-hider.vue';
 import axios from 'axios';
+import WSSession from './ws.js';
 
 import 'bootstrap/dist/css/bootstrap.css';
 import 'bootstrap-vue/dist/bootstrap-vue.css';
@@ -91,8 +92,10 @@ new Vue({
     this.updateUser();
     this.chinterval = window.setInterval(this.updateChannels, 5000);
     this.userinterval = window.setInterval(this.updateUser, 300000);
+    this.ws = new WSSession(location);
   },
   beforeDestroy () {
+    this.ws.close();
     window.clearInterval(this.chinterval);
     window.clearInterval(this.userinterval);
   }

@@ -1,6 +1,5 @@
 // import Hls from 'hls.js/dist/hls';
 import { MediaPlayer } from 'dashjs';
-import Axios from 'axios';
 
 // play video when ready and restore and save volume
 function autoplay (video) {
@@ -176,7 +175,7 @@ export class DASHPlayer {
 }
 
 export class RTCPlayer {
-  constructor (video, sdpURL) {
+  constructor (video, ws, channel) {
     autoplay(video);
     this.pc = new RTCPeerConnection({
       iceServers: [{
@@ -186,6 +185,15 @@ export class RTCPlayer {
         ]
       }]
     });
+    // accept audio and video
+    let offerArgs = {};
+    try {
+      this.pc.addTransceiver('audio', { direction: 'recvonly' });
+      this.pc.addTransceiver('video', { direction: 'recvonly' });
+    } catch (error) {
+      // backwards compat
+      offerArgs = { offerToReceiveVideo: true, offerToReceiveAudio: true };
+    }
     // as the RTC session sets up tracks, attach them to a media stream that will feed the player
     const ms = new MediaStream();
     this.pc.ontrack = function (ev) {
@@ -196,30 +204,28 @@ export class RTCPlayer {
         video.src = URL.createObjectURL(ms);
       }
     };
-    this.pc.onicecandidate = (ev) => {
-      if (ev.candidate !== null) {
-        // still gathering candidates
-        return;
-      }
-      // full set of candidates is done, send the offer
-      Axios.post(sdpURL, this.pc.localDescription)
-        .then(d => this.pc.setRemoteDescription(new RTCSessionDescription(d.data)));
-    };
-    // offer to receive
-    let offerArgs = {};
-    try {
-      this.pc.addTransceiver('audio', { direction: 'recvonly' });
-      this.pc.addTransceiver('video', { direction: 'recvonly' });
-    } catch (error) {
-      // backwards compat
-      offerArgs = { offerToReceiveVideo: true, offerToReceiveAudio: true };
-    }
-    this.pc.createOffer(offerArgs).then(d => this.pc.setLocalDescription(d));
-    // icecandidate gets called a bunch and then eventually with null, at which point the offer will be sent
+    this.pc.addEventListener('icecandidate', (ev) => ws.candidate(ev.candidate));
+    ws.onCandidate = (cand) => this.pc.addIceCandidate(cand);
+    // request an offer
+    ws.play(channel)
+      .then((offer) => this.pc.setRemoteDescription(new RTCSessionDescription(offer)))
+      .then(() => this.pc.createAnswer(offerArgs))
+      .then((answer) => {
+        this.ws.answer(answer);
+        this.pc.setLocalDescription(answer);
+      });
+    this.ws = ws;
   }
 
   destroy () {
-    this.pc.close();
+    if (this.ws !== null) {
+      this.ws.stop();
+      this.ws = null;
+    }
+    if (this.pc !== null) {
+      this.pc.close();
+      this.pc = null;
+    }
   }
 
   seekLive () {

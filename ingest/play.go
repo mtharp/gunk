@@ -55,35 +55,15 @@ func (m *Manager) ServeWeb(rw http.ResponseWriter, req *http.Request, name strin
 	return nil
 }
 
-func (m *Manager) ServeSDP(rw http.ResponseWriter, req *http.Request, name string) error {
+func (m *Manager) OfferSDP(r playrtc.PlayRequest, name string) (*playrtc.Sender, error) {
 	ch := m.channel(name)
 	if ch == nil {
-		return ErrNoChannel
+		return nil, ErrNoChannel
 	}
-	src := func() av.Demuxer { return ch.queue(true) }
-	addV := func(delta int) { ch.addViewer(int32(delta)) }
-	return playrtc.HandleSDP(rw, req, src, addV)
+	r.Source = func() av.Demuxer { return ch.queue(true) }
+	r.AddViewer = func(delta int) { ch.addViewer(int32(delta)) }
+	return r.OfferToSend()
 }
-
-// func (m *Manager) AnswerSDP(o playrtc.OfferToReceive, name string) (*playrtc.Sender, error) {
-// 	ch := m.channel(name)
-// 	if ch == nil {
-// 		return nil, ErrNoChannel
-// 	}
-// 	o.Source = func() av.Demuxer { return ch.queue(true) }
-// 	o.AddViewer = func(delta int) { ch.addViewer(int32(delta)) }
-// 	return o.Answer()
-// }
-
-// func (m *Manager) OfferSDP(r playrtc.PlayRequest, name string) (*playrtc.Sender, error) {
-// 	ch := m.channel(name)
-// 	if ch == nil {
-// 		return nil, ErrNoChannel
-// 	}
-// 	r.Source = func() av.Demuxer { return ch.queue(true) }
-// 	r.AddViewer = func(delta int) { ch.addViewer(int32(delta)) }
-// 	return r.OfferToSend()
-// }
 
 func (m *Manager) PopulateLive(infos []*model.ChannelInfo) {
 	for _, info := range infos {

@@ -2,7 +2,6 @@ export default class WSSession {
   constructor (loc) {
     this.onCandidate = null;
     this.pendOffer = null;
-    this.pendAnswer = null;
     this.tsBase = null;
     let wsURL = (loc.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + loc.hostname;
     if (loc.port) {
@@ -24,19 +23,13 @@ export default class WSSession {
 
   recvMsg (data) {
     const msg = JSON.parse(data);
-    // console.log('received', msg);
+    console.log('received', msg);
     switch (msg.type) {
       case 'offer':
         if (this.pendOffer) {
           this.pendOffer(msg.sdp);
         }
         this.pendOffer = null;
-        break;
-      case 'answer':
-        if (this.pendAnswer) {
-          this.pendAnswer(msg.sdp);
-        }
-        this.pendAnswer = null;
         break;
       case 'candidate':
         if (this.onCandidate) {
@@ -55,16 +48,6 @@ export default class WSSession {
     return p;
   }
 
-  offer (channel, offer) {
-    const p = new Promise((resolve) => { this.pendAnswer = resolve; });
-    this.sendMsg({
-      type: 'offer',
-      name: channel,
-      sdp: offer
-    });
-    return p;
-  }
-
   answer (answer) {
     this.sendMsg({ type: 'answer', sdp: answer });
   }
@@ -77,7 +60,6 @@ export default class WSSession {
   }
 
   stop () {
-    this.pendAnser = null;
     this.onCandidate = null;
     this.sendMsg({ type: 'stop' });
   }

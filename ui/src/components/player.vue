@@ -241,7 +241,7 @@ export default {
     document.addEventListener("keydown", this.onKey);
     let video = this.$refs.video;
     if (this.rtcActive) {
-      this.player = new RTCPlayer(video, this.sdpURL);
+      this.player = new RTCPlayer(video, this.$root.ws, this.ch.name);
       this.atTail = true;
     } else if (nativeRequired()) {
       this.player = new NativePlayer(video, this.nativeURL);
