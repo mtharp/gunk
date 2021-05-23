@@ -88,12 +88,13 @@ export default {
 .channel-card-title h1 {
   margin: 0 0 0 0.5rem;
   font-size: 200%;
+  font-family: "Montserrat", sans-serif;
   position: absolute;
   bottom: 0;
   width: 290px;
   max-height: 200px;
   overflow: hidden;
-  text-shadow: 2px 2px 2px black;
+  text-shadow: 3px 3px 2px black;
 }
 .channel-card-title h1.long-title {
   font-size: 130%;

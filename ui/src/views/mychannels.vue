@@ -95,7 +95,7 @@
             <b-card-text>
               <ul>
                 <li>Output Mode: Advanced</li>
-                <li>Keyframe Interval: 2 seconds</li>
+                <li>Keyframe Interval: 5 seconds</li>
                 <li>Preset: Quality</li>
                 <li>Profile: high</li>
                 <li><strong>Max B-frames: 0</strong></li>
@@ -106,7 +106,7 @@
             <b-card-text>
               <ul>
                 <li>Output Mode: Advanced</li>
-                <li>Keyframe Interval: 2 seconds</li>
+                <li>Keyframe Interval: 5 seconds</li>
                 <li>Preset: veryfast</li>
                 <li>Profile: high</li>
                 <li>Tune: (none)</li>

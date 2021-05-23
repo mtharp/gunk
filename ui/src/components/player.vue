@@ -169,22 +169,6 @@
 <script>
 import VueSlider from "vue-slider-component";
 import "vue-slider-component/theme/default.css";
-import {
-  BIconClipboardData,
-  BIconClockHistory,
-  BIconEyeFill,
-  BIconFullscreen,
-  BIconFullscreenExit,
-  BIconGearFill,
-  BIconLightning,
-  BIconLightningFill,
-  BIconPauseFill,
-  BIconPlayFill,
-  BIconSoundwave,
-  BIconVolumeMuteFill,
-  BIconVolumeUpFill,
-  BIconSkipForwardFill
-} from "bootstrap-vue";
 
 import {
   DASHPlayer,
@@ -197,20 +181,6 @@ export default {
   name: "player",
   props: ["ch", "rtcActive", "lowLatency"],
   components: {
-    BIconClipboardData,
-    BIconClockHistory,
-    BIconEyeFill,
-    BIconFullscreen,
-    BIconFullscreenExit,
-    BIconGearFill,
-    BIconLightning,
-    BIconLightningFill,
-    BIconPauseFill,
-    BIconPlayFill,
-    BIconSoundwave,
-    BIconVolumeMuteFill,
-    BIconVolumeUpFill,
-    BIconSkipForwardFill,
     VueSlider
   },
   data() {

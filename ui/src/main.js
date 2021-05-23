@@ -7,10 +7,11 @@ import WSSession from './ws.js';
 
 import 'bootstrap/dist/css/bootstrap.css';
 import 'bootstrap-vue/dist/bootstrap-vue.css';
-import BootstrapVue from 'bootstrap-vue';
+import { BootstrapVue, BootstrapVueIcons } from 'bootstrap-vue';
 import VueTimeago from 'vue-timeago';
 
 Vue.use(BootstrapVue);
+Vue.use(BootstrapVueIcons);
 Vue.use(VueTimeago, { locale: 'en' });
 Vue.config.productionTip = false;
 
@@ -62,6 +63,9 @@ new Vue({
     },
     navChannel (name) {
       return { name: 'watch', params: { channel: name } };
+    },
+    pushChannel (name) {
+      this.$router.push(this.navChannel(name));
     }
   },
   computed: {
