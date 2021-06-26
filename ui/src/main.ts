@@ -3,7 +3,9 @@ import App from './app.vue';
 import router from './router';
 import ControlsHider from './components/controls-hider.vue';
 import { APIMixin } from './api';
-import axios from 'axios';
+import store from './store';
+import channels from './store/channels';
+import userinfo from './store/userinfo';
 
 import 'bootstrap/dist/css/bootstrap.css';
 import 'bootstrap-vue/dist/bootstrap-vue.css';
@@ -32,6 +34,9 @@ export default class Gunk extends mixins(ControlsHider, APIMixin) {
   readonly siteName = process.env.VUE_APP_SITE_NAME;
 
   mounted () {
+    channels.refreshChannels();
+    userinfo.refreshUserInfo();
+    window.setInterval(userinfo.refreshUserInfo, 300000);
     this.api.connect();
   }
   beforeDestroy () {
@@ -41,5 +46,6 @@ export default class Gunk extends mixins(ControlsHider, APIMixin) {
 
 new Gunk({
   router,
+  store,
   render: h => h(App),
 }).$mount('#app');

@@ -22,6 +22,7 @@
 </template>
 
 <script lang="ts">
+import channels from "@/store/channels";
 import Vue from "vue";
 import Component, { mixins } from 'vue-class-component';
 import { APIMixin } from "../api";
@@ -41,7 +42,7 @@ export default class Watch extends mixins(WatchProps, APIMixin) {
   $root!: Gunk;
   
     get chInfo() {
-      const ch = this.api.channels[this.channel];
+      const ch = channels.channels[this.channel];
       if (ch) {
         return ch;
       }

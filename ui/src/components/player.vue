@@ -167,7 +167,8 @@
 import Vue, { PropType } from "vue";
 import Component, { mixins } from "vue-class-component";
 import VueSlider from "vue-slider-component";
-import { APIMixin, ChannelInfo } from "../api";
+import { APIMixin } from "../api";
+import { ChannelInfo } from "@/store/channels";
 import Gunk from "../main";
 import "vue-slider-component/theme/default.css";
 

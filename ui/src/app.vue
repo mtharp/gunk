@@ -23,7 +23,7 @@
             rounded
             @click="pushChannel(name)"
             :key="name"
-            :src="api.channels[name].thumb"
+            :src="thumb(name)"
             size="32px"
             class="ml-2"
             v-b-tooltip.hover
@@ -33,21 +33,21 @@
       </b-navbar-nav>
       <b-navbar-nav class="ml-auto">
         <b-nav-form v-if="!loggedIn">
-          <b-button size="sm" class="mr-2" @click.prevent="api.doLogin"
+          <b-button size="sm" class="mr-2" @click.prevent="userinfo.login"
             >Login</b-button
           >
         </b-nav-form>
         <b-nav-form v-if="loggedIn">
           <b-avatar
-            :src="avatar"
+            :src="userinfo.avatar"
             size="32px"
             alt="your avatar"
             class="mr-3"
             button
             v-b-tooltip.hover
-            :title="'Logged in as ' + account"
+            :title="'Logged in as ' + userinfo.account"
           />
-          <b-button size="sm" class="mr-sm-2" @click.prevent="api.doLogout"
+          <b-button size="sm" class="mr-sm-2" @click.prevent="userinfo.logout"
             >Logout</b-button
           >
         </b-nav-form>
@@ -61,6 +61,8 @@
 import Component, { mixins } from 'vue-class-component';
 import { APIMixin } from './api';
 import Gunk from "./main";
+import channels from './store/channels';
+import userinfo from './store/userinfo';
 
 @Component
 export default class App extends mixins(APIMixin) {
@@ -74,23 +76,21 @@ export default class App extends mixins(APIMixin) {
     this.$router.push(this.navChannel(name));
   }
 
-    get loggedIn () { return !!this.api.user?.id }
-    get avatar() { return this.api.user?.avatar }
-    get account() {
-      if (!this.api.user) {
-        return "";
-      }
-      return this.api.user.username + "#" + this.api.user.discriminator;
-    }
+  get userinfo() { return userinfo; }
+  get loggedIn () { return !!userinfo.user.id }
     get liveChannels () {
         const live = [];
-        for (const ch of Object.values(this.api.channels)) {
+        for (const ch of Object.values(channels.channels)) {
             if (ch.live) {
                 live.push(ch.name);
             }
         }
         return live.sort();
     }
+
+  thumb(name: string) {
+    return channels.channels[name].thumb
+  }
 }
 </script>
 

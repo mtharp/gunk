@@ -1,4 +1,4 @@
-import { ChannelInfo } from "./api";
+import { ChannelInfo } from "@/store/channels";
 
 const initialDelay = 100;
 const maxDelay = 10000;

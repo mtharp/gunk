@@ -1,21 +1,21 @@
 <template>
   <div class="home">
-    <div v-for="name in api.recentChannels" :key="name" class="channel-card">
+    <div v-for="name in recentChannels" :key="name" class="channel-card">
       <router-link :to="navChannel(name)">
-        <img :src="api.channels[name].thumb" />
-        <div v-if="!api.channels[name].live" class="channel-shade">OFFLINE</div>
+        <img :src="channels[name].thumb" />
+        <div v-if="!channels[name].live" class="channel-shade">OFFLINE</div>
         <div class="channel-card-title">
           <h1 :class="{'long-title': name.length > 20}">{{name}}</h1>
           <div class="channel-status">
-            <span v-if="api.channels[name].live" class="channel-live">
+            <span v-if="channels[name].live" class="channel-live">
               LIVE
               <b-icon-eye-fill />
-              {{api.channels[name].viewers}}
+              {{channels[name].viewers}}
             </span>
             <timeago
-              v-if="!api.channels[name].live"
+              v-if="!channels[name].live"
               class="channel-notlive"
-              :datetime="api.channels[name].last"
+              :datetime="channels[name].last"
               :auto-update="60"
             />
           </div>
@@ -29,6 +29,7 @@
 import Component, { mixins } from "vue-class-component";
 import { BIconEyeFill } from "bootstrap-vue";
 import { APIMixin } from "../api";
+import channels from "@/store/channels";
 
 @Component({
   components: { BIconEyeFill },
@@ -37,6 +38,9 @@ export default class Home extends mixins(APIMixin) {
   navChannel (name: string) {
     return { name: 'watch', params: { channel: name } };
   }
+
+  get channels() {    return channels.channels;  }
+  get recentChannels() {    return channels.recentChannels;  }
 }
 </script>
 
