@@ -5,7 +5,7 @@ import (
 	"regexp"
 )
 
-//go:embed router.js
+//go:embed router.ts
 var router string
 
 func IndexRoutes() (routes []string) {

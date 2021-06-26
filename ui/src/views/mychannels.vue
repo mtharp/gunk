@@ -6,7 +6,7 @@
         <b-form-group label="Channel Name">
           <b-form-input v-model="newName" required />
         </b-form-group>
-        <b-alert :show="alert !== null" variant="danger">{{ alert }}</b-alert>
+        <b-alert :show="alert != ''" variant="danger">{{ alert }}</b-alert>
         <b-button type="submit" variant="primary">Create</b-button>
       </b-form>
       <b-list-group class="mt-5">
@@ -124,72 +124,77 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
+import Component from "vue-class-component";
+import Vue from "vue";
 import axios from "axios";
 
-export default {
-  name: "mychannels",
-  data() {
-    return {
-      defs: [],
-      newName: null,
-      selected: null,
-      showKey: false,
-      revealKey: false,
-      ftl_config: "",
-      alert: null
-    };
-  },
-  mounted() {
-    axios.get("/api/mychannels").then(response => {
-      this.defs = response.data.channels;
-      this.ftl_config = response.data.ftl;
-    });
-  },
-  methods: {
-    doCreate() {
-      this.alert = null;
-      axios
-        .post("/api/mychannels", { name: this.newName })
-        .then(response => {
-          let def = response.data;
-          if (this.defs === null) {
-            this.defs = [def];
-          } else {
-            this.defs.unshift(def);
-          }
-          this.newName = "";
-        })
-        .catch(error => {
-          if (error.response.status == 409) {
-            this.alert = "Channel name is already in use";
-          } else {
-            this.alert = "HTTP error while creating channel";
-          }
-        });
-    },
-    doUpdate(def) {
-      axios.put("/api/mychannels/" + encodeURIComponent(def.name), def);
-    },
-    doDelete(def) {
-      this.$bvModal
-        .msgBoxConfirm("Delete channel " + def.name + "?", {
-          title: "Delete Channel",
-          okVariant: "danger",
-          okTitle: "Delete"
-        })
-        .then(confirmed => {
-          if (confirmed) {
-            axios
-              .delete("/api/mychannels/" + encodeURIComponent(def.name))
-              .then(() => this.defs.splice(this.defs.indexOf(def), 1));
-          }
-        });
-    },
-    doShow(def) {
-      this.selected = def;
-      this.showKey = true;
+interface ChannelDef {
+  name: string;
+  key?: string;
+  announce?: boolean;
+  ftl_key?: string;
+  rtmp_dir?: string;
+  rtmp_base?: string;
+}
+
+interface ChannelsResponse {
+  channels: ChannelDef[];
+  ftl: string;
+}
+
+@Component
+export default class MyChannels extends Vue {
+  defs: ChannelDef[] = [];
+  selected: ChannelDef = {name: ""};
+  newName = "";
+  showKey = false;
+  revealKey = false;
+  ftl_config = "";
+  alert = "";
+
+  async mounted() {
+    const { data } = await axios.get<ChannelsResponse>("/api/mychannels");
+    this.defs = data.channels;
+    this.ftl_config = data.ftl;
+  }
+
+  async doCreate() {
+    this.alert = "";
+    try {
+      const { data } = await axios.post<ChannelDef>("/api/mychannels", { name: this.newName });
+      if (this.defs) {
+        this.defs.unshift(data);
+      } else {
+        this.defs = [data];
+      }
+      this.newName = "";
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status == 409) {
+        this.alert = "Channel name is already in use";
+      } else {
+        this.alert = "HTTP error while creating channel";
+      }
     }
   }
-};
+  doUpdate(def: ChannelDef) {
+    axios.put("/api/mychannels/" + encodeURIComponent(def.name), def);
+  }
+  async doDelete(def: ChannelDef) {
+    const confirmed = await this.$bvModal.msgBoxConfirm(
+      "Delete channel " + def.name + "?", {
+        title: "Delete Channel",
+        okVariant: "danger",
+        okTitle: "Delete"
+      });
+    if (confirmed) {
+      await axios.delete("/api/mychannels/" + encodeURIComponent(def.name));
+      this.defs.splice(this.defs.indexOf(def), 1);
+    }
+  }
+  doShow(def: ChannelDef) {
+    this.selected = def;
+    this.showKey = true;
+  }
+}
 </script>

@@ -21,16 +21,27 @@
   </div>
 </template>
 
-<script>
-import Player from "../components/player";
+<script lang="ts">
+import Vue from "vue";
+import Component, { mixins } from 'vue-class-component';
+import { APIMixin } from "../api";
+import Player from "../components/player.vue";
+import Gunk from "../main";
 
-export default {
-  name: "watch",
-  props: ["channel"],
+const WatchProps = Vue.extend({
+  props: {
+    channel: String,
+  }
+});
+
+@Component({
   components: { Player },
-  computed: {
-    chInfo() {
-      const ch = this.$root.channels[this.channel];
+})
+export default class Watch extends mixins(WatchProps, APIMixin) {
+  $root!: Gunk;
+  
+    get chInfo() {
+      const ch = this.api.channels[this.channel];
       if (ch) {
         return ch;
       }
@@ -40,10 +51,9 @@ export default {
         thumb: null,
         viewers: 0
       };
-    },
-    rtcActive() {
+    }
+    get rtcActive() {
       return this.$root.rtcSelected && this.chInfo.rtc;
     }
-  }
-};
+}
 </script>

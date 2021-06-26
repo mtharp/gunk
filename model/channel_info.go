@@ -10,7 +10,6 @@ type ChannelInfo struct {
 	LiveURL   string `json:"live_url"`
 	WebURL    string `json:"web_url"`
 	NativeURL string `json:"native_url"`
-	PubID     string `json:"pub_id"`
 	Viewers   int    `json:"viewers"`
 	RTC       bool   `json:"rtc"`
 }

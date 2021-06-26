@@ -11,22 +11,29 @@
     "axios": "^0.21.1",
     "bootstrap": "^4.6.0",
     "bootstrap-vue": "^2.21.2",
-    "dashjs": "^3.2.2",
+    "dashjs": "/home/gxti/gh/dash.js",
     "lodash": "^4.17.20",
     "vue": "^2.6.12",
+    "vue-class-component": "^7.2.3",
+    "vue-property-decorator": "^9.1.2",
     "vue-router": "^3.5.1",
     "vue-slider-component": "^3.2.11",
     "vue-timeago": "^5.1.3"
   },
   "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^4.15.1",
+    "@typescript-eslint/parser": "^4.15.1",
     "@vue/cli-plugin-babel": "^4.5.8",
     "@vue/cli-plugin-eslint": "^5.0.0-alpha.8",
+    "@vue/cli-plugin-typescript": "~4.5.0",
     "@vue/cli-service": "^4.5.8",
+    "@vue/eslint-config-typescript": "^7.0.0",
     "babel-eslint": "^10.0.2",
     "compression-webpack-plugin": "^6.1.1",
     "eslint": "^7.12.1",
     "eslint-plugin-vue": "^7.1.0",
     "semistandard": "^16.0.0",
+    "typescript": "~4.1.5",
     "vue-template-compiler": "^2.6.12"
   },
   "eslintConfig": {
@@ -36,17 +43,13 @@
     },
     "extends": [
       "plugin:vue/essential",
-      "eslint:recommended"
+      "eslint:recommended",
+      "@vue/typescript"
     ],
     "rules": {},
     "parserOptions": {
-      "parser": "babel-eslint"
+      "parser": "@typescript-eslint/parser"
     }
-  },
-  "semistandard": {
-    "envs": [
-      "browser"
-    ]
   },
   "postcss": {
     "plugins": {
@@ -57,5 +60,10 @@
     "> 1%",
     "last 2 versions",
     "not ie <= 8"
-  ]
+  ],
+  "semistandard": {
+    "envs": [
+      "browser"
+    ]
+  }
 }

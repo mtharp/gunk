@@ -1,52 +1,66 @@
+import { ChannelInfo } from "./api";
+
 const initialDelay = 100;
 const maxDelay = 10000;
 
 export default class WSSession {
-  constructor (loc) {
-    this.onCandidate = null;
-    this.pendOffer = null;
+  wsURL: string;
+  last: number;
+  session = "";
+  delay = initialDelay;
+
+  ping?: number;
+  timer?: number;
+  ws?: WebSocket;
+
+  onChannel?: (ch: ChannelInfo) => void;
+  onCandidate?: (cand: RTCIceCandidateInit) => void;
+  pendOffer?: (offer: RTCSessionDescriptionInit) => void;
+
+  constructor (loc: Location) {
     let wsURL = (loc.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + loc.hostname;
     if (loc.port) {
       wsURL += ':' + loc.port;
     }
     this.wsURL = wsURL + '/ws';
-    this.session = '';
     this.delay = initialDelay;
-    this.timer = null;
     this.last = performance.now();
     this.ping = window.setInterval(() => this.doPing(), 10000);
-    this.onChannel = null;
     this.connect();
   }
 
   connect () {
-    this.timer = null;
+    this.timer = undefined;
     let url = this.wsURL;
     if (this.session) {
       url += '?session=' + this.session;
     }
     console.log('websocket connecting to', url);
     this.ws = new WebSocket(url);
-    this.ws.addEventListener('message', (ev) => this.recvMsg(ev.data));
+    this.ws.addEventListener('message', (ev) => this.recvMsg(ev));
     this.ws.addEventListener('error', (ev) => this.onError(ev));
   }
 
   close () {
-    this.ws.close();
-    this.ws = null;
-    if (this.timer !== null) {
-      window.clearTimeout(this.timer);
-      this.timer = null;
+    if (this.ws) {
+      this.ws.close();
+      this.ws = undefined;
     }
-    if (this.ping !== null) {
+    if (this.timer) {
+      window.clearTimeout(this.timer);
+      this.timer = undefined;
+    }
+    if (this.ping) {
       window.clearInterval(this.ping);
-      this.ping = null;
+      this.ping = undefined;
     }
   }
 
-  onError (ev) {
-    this.ws.close();
-    this.ws = null;
+  onError (ev: Event | string) {
+    if (this.ws) {
+      this.ws.close();
+      this.ws = undefined;
+    }
     console.log('websocket disconnected:', ev);
     const delay = this.delay;
     this.delay *= 1.618;
@@ -59,8 +73,8 @@ export default class WSSession {
     }
   }
 
-  sendMsg (obj) {
-    if (this.ws === null) {
+  sendMsg (obj: any) {
+    if (!this.ws) {
       return;
     }
     const lastReceived = (performance.now() - this.last) / 1000;
@@ -71,8 +85,8 @@ export default class WSSession {
     this.ws.send(JSON.stringify(obj));
   }
 
-  recvMsg (data) {
-    const msg = JSON.parse(data);
+  recvMsg (ev: MessageEvent) {
+    const msg = JSON.parse(ev.data);
     this.last = performance.now();
     switch (msg.type) {
       case 'connected':
@@ -83,7 +97,7 @@ export default class WSSession {
         if (this.pendOffer) {
           this.pendOffer(msg.sdp);
         }
-        this.pendOffer = null;
+        this.pendOffer = undefined;
         break;
       case 'candidate':
         if (this.onCandidate) {
@@ -102,17 +116,17 @@ export default class WSSession {
     this.sendMsg({ type: 'ping' });
   }
 
-  play (channel) {
-    const p = new Promise((resolve) => { this.pendOffer = resolve; });
+  play (channel: string): Promise<RTCSessionDescriptionInit> {
+    const p = new Promise<RTCSessionDescriptionInit>((resolve) => { this.pendOffer = resolve; });
     this.sendMsg({ type: 'play', name: channel });
     return p;
   }
 
-  answer (answer) {
+  answer (answer: RTCSessionDescriptionInit) {
     this.sendMsg({ type: 'answer', sdp: answer });
   }
 
-  candidate (candidate) {
+  candidate (candidate: RTCIceCandidateInit) {
     if (!candidate || !candidate.candidate) {
       return;
     }
@@ -120,7 +134,7 @@ export default class WSSession {
   }
 
   stop () {
-    this.onCandidate = null;
+    this.onCandidate = undefined;
     this.sendMsg({ type: 'stop' });
   }
 }

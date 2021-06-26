@@ -4,13 +4,10 @@
       ref="video"
       class="w-100 h-100"
       :poster="initPoster"
-      @play="
-        playing = true;
-        volume = $refs.video.volume;
-      "
+      @play="onPlay"
       @pause="playing = false"
       @ended="playing = false"
-      @volumechange="muted = $refs.video.muted"
+      @volumechange="onVolumeChange"
       @click="$root.controlsTouched"
     ></video>
     <div :class="classes">
@@ -74,7 +71,7 @@
       </div>
       <div class="d-flex justify-content-end align-items-center">
         <!-- latency and seek to live -->
-        <template v-if="!$parent.rtcActive">
+        <template v-if="!rtcActive">
           <div
             v-if="playing"
             class="controls-latency"
@@ -107,7 +104,7 @@
           </button>
         </template>
         <div
-          v-if="playing && $parent.rtcActive"
+          v-if="playing && rtcActive"
           class="controls-rtclabel text-success"
           v-b-tooltip.hover
           title="Real-time stream has near-zero latency"
@@ -166,52 +163,67 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
+import Vue, { PropType } from "vue";
+import Component, { mixins } from "vue-class-component";
 import VueSlider from "vue-slider-component";
+import { APIMixin, ChannelInfo } from "../api";
+import Gunk from "../main";
 import "vue-slider-component/theme/default.css";
 
-import {
-  DASHPlayer,
-  RTCPlayer,
-  NativePlayer,
-  nativeRequired
-} from "../player.js";
+import { DASHPlayer, RTCPlayer, NativePlayer, nativeRequired } from "../player";
 
-export default {
-  name: "player",
-  props: ["ch", "rtcActive", "lowLatency"],
-  components: {
-    VueSlider
-  },
-  data() {
-    return {
-      hasFullscreen: document.fullscreenEnabled,
-      isFullscreen: document.fullscreenElement !== null,
-      isWebKit: navigator.userAgent.indexOf("WebKit") >= 0,
-      playing: false,
-      initPoster: this.ch.thumb,
-      muted: true,
-      volume: 0,
+interface PlayerProvider {
+  destroy(): void;
+  seekLive(): void;
+  latencyTo(): number;
+}
 
-      latency: 0,
-      latencyTimer: null,
-      keyTimer: null,
-      keyPressed: false,
-      atTail: false,
-      catchingUp: false,
-      showCopyVLC: false
-    };
-  },
+const PlayerProps = Vue.extend({
+  props: {
+    ch: Object as PropType<ChannelInfo>,
+    rtcActive: Boolean,
+    lowLatency: Boolean
+  }
+});
+
+@Component({
+  components: { VueSlider }
+})
+export default class Player extends mixins(PlayerProps, APIMixin) {
+  player?: PlayerProvider;
+  hasFullscreen = document.fullscreenEnabled;
+  isFullscreen = document.fullscreenElement !== null;
+  isWebKit = navigator.userAgent.indexOf("WebKit") >= 0;
+  playing = false;
+  initPoster = "";
+  muted = true;
+  volume = 0;
+
+  latency = 0;
+  latencyTimer?: number;
+  keyTimer?: number;
+  keyPressed = false;
+  atTail = false;
+  catchingUp = false;
+  showCopyVLC = false;
+
+  $root!: Gunk;
+  $refs!: {
+    video: HTMLVideoElement;
+    copyVLCInput: HTMLInputElement;
+  };
+
   created() {
+    this.initPoster = this.ch.thumb;
     document.addEventListener("fullscreenchange", this.onFullscreen);
     this.$root.startHidingControls(this.$vnode.key);
-  },
+  }
   mounted() {
-    this.keyTimer = null;
     document.addEventListener("keydown", this.onKey);
     let video = this.$refs.video;
-    if (this.rtcActive) {
-      this.player = new RTCPlayer(video, this.$root.ws, this.ch.name);
+    if (this.rtcActive && this.api.ws) {
+      this.player = new RTCPlayer(video, this.api.ws, this.ch.name);
       this.atTail = true;
     } else if (nativeRequired()) {
       this.player = new NativePlayer(video, this.nativeURL);
@@ -223,7 +235,7 @@ export default {
       // }
       this.latencyTimer = window.setInterval(this.updateLatency, 1000);
     }
-  },
+  }
   beforeDestroy() {
     document.removeEventListener("keydown", this.onKey);
     document.removeEventListener("fullscreenchange", this.onFullscreen);
@@ -234,126 +246,129 @@ export default {
       window.clearInterval(this.latencyTimer);
     }
     this.$root.stopHidingControls(this.$vnode.key);
-    if (this.player) {
-      this.player.destroy();
-      this.player = null;
-    }
-  },
-  computed: {
-    classes() {
-      return Object.assign({ controls: true }, this.$root.hiddenControlClasses);
-    },
-    volumeClasses() {
-      return { volume: true, "key-pressed": this.keyPressed };
-    },
-    webURL() {
-      return this.ch.web_url;
-    },
-    nativeURL() {
-      return this.ch.native_url;
-    },
-    sdpURL() {
-      return "/sdp/" + encodeURIComponent(this.ch.name);
-    },
-    playlistURL() {
-      return "/live/" + encodeURIComponent(this.ch.name) + ".m3u8";
-    }
-  },
-  methods: {
-    onFullscreen() {
-      this.isFullscreen = document.fullscreenElement !== null;
-    },
-    toggleFullscreen() {
-      if (this.isFullscreen) {
-        document.exitFullscreen();
-      } else {
-        this.$el.requestFullscreen();
-      }
-    },
-    onKey(ev) {
-      this.$root.controlsTouched();
-      this.keyPressed = true;
-      if (this.keyTimer) {
-        window.clearTimeout(this.keyTimer);
-      }
-      this.keyTimer = window.setTimeout(() => {
-        this.keyPressed = false;
-        this.keyTimer = null;
-      }, 3000);
-      switch (ev.key) {
-        case "f":
-          this.toggleFullscreen();
-          break;
-        case "k":
-          if (this.playing) {
-            this.$refs.video.pause();
-          } else {
-            this.$refs.video.play();
-          }
-          break;
-        case "j":
-          this.seekLive();
-          break;
-        case "m":
-          this.muted = !this.muted;
-          this.$refs.video.muted = this.muted;
-          break;
-        case "ArrowDown":
-          if (this.volume > 0.05) {
-            this.volume -= 0.05;
-          } else {
-            this.volume = 0;
-          }
-          this.$refs.video.volume = this.volume;
-          this.$refs.video.muted = false;
-          break;
-        case "ArrowUp":
-          if (this.volume < 0.95) {
-            this.volume += 0.05;
-          } else {
-            this.volume = 1;
-          }
-          this.$refs.video.volume = this.volume;
-          this.$refs.video.muted = false;
-          break;
-      }
-    },
-    seekLive() {
-      this.player.seekLive();
-    },
-    updateLatency() {
-      if (!this.playing) {
-        this.latency = 0;
-        return;
-      }
-      this.catchingUp = this.player.video.playbackRate != 1;
-      const latency = this.player.latencyTo();
-      if (latency !== null) {
-        [this.latency, this.atTail] = latency;
-      }
-    },
-    // copy VLC URL to clipboard
-    copyVLC() {
-      this.showCopyVLC = true;
-      this.$nextTick(() => {
-        this.$refs.copyVLCInput.select();
-        document.execCommand("copy");
-        this.$nextTick(() => {
-          this.showCopyVLC = false;
-          this.$bvToast.toast(
-            "Open VLC, press Ctrl-N and paste to play the stream",
-            {
-              title: "Stream URL copied",
-              isStatus: true,
-              toaster: "b-toaster-bottom-right",
-              autoHideDelay: 2000
-            }
-          );
-        });
-      });
+      this.player?.destroy();
+  }
+
+  get classes() {
+    return Object.assign(
+      { controls: true },
+      this.$root.hiddenControlClasses
+    );
+  }
+  get volumeClasses() {
+    return { volume: true, "key-pressed": this.keyPressed };
+  }
+  get webURL() {
+    return this.ch.web_url;
+  }
+  get nativeURL() {
+    return this.ch.native_url;
+  }
+  get sdpURL() {
+    return "/sdp/" + encodeURIComponent(this.ch.name);
+  }
+  get playlistURL() {
+    return "/live/" + encodeURIComponent(this.ch.name) + ".m3u8";
+  }
+
+  onFullscreen() {
+    this.isFullscreen = document.fullscreenElement !== null;
+  }
+  toggleFullscreen() {
+    if (this.isFullscreen) {
+      document.exitFullscreen();
+    } else {
+      this.$el.requestFullscreen();
     }
   }
-};
+  onPlay() {
+    this.playing = true;
+    this.volume = this.$refs.video.volume;
+  }
+  onVolumeChange() {
+    this.muted = this.$refs.video.muted
+  }
+  onKey(ev: KeyboardEvent) {
+    this.$root.controlsTouched();
+    this.keyPressed = true;
+    if (this.keyTimer) {
+      window.clearTimeout(this.keyTimer);
+    }
+    this.keyTimer = window.setTimeout(() => {
+      this.keyPressed = false;
+      this.keyTimer = undefined;
+    }, 3000);
+    switch (ev.key) {
+      case "f":
+        this.toggleFullscreen();
+        break;
+      case "k":
+        if (this.playing) {
+          this.$refs.video.pause();
+        } else {
+          this.$refs.video.play();
+        }
+        break;
+      case "j":
+        this.seekLive();
+        break;
+      case "m":
+        this.muted = !this.muted;
+        this.$refs.video.muted = this.muted;
+        break;
+      case "ArrowDown":
+        if (this.volume > 0.05) {
+          this.volume -= 0.05;
+        } else {
+          this.volume = 0;
+        }
+        this.$refs.video.volume = this.volume;
+        this.$refs.video.muted = false;
+        break;
+      case "ArrowUp":
+        if (this.volume < 0.95) {
+          this.volume += 0.05;
+        } else {
+          this.volume = 1;
+        }
+        this.$refs.video.volume = this.volume;
+        this.$refs.video.muted = false;
+        break;
+    }
+  }
+  seekLive() {
+    this.player?.seekLive();
+  }
+  updateLatency() {
+    if (!this.playing || !this.player) {
+      this.latency = 0;
+      return;
+    }
+    this.catchingUp = this.$refs.video.playbackRate != 1;
+    this.latency = this.player.latencyTo();
+    this.atTail = this.latency < 5;
+  }
+  // copy VLC URL to clipboard
+  copyVLC() {
+    this.showCopyVLC = true;
+    this.$nextTick(() => {
+      this.$refs.copyVLCInput.select();
+      document.execCommand("copy");
+      this.$nextTick(() => {
+        this.showCopyVLC = false;
+        this.$bvToast.toast(
+          "Open VLC, press Ctrl-N and paste to play the stream",
+          {
+            title: "Stream URL copied",
+            isStatus: true,
+            toaster: "b-toaster-bottom-right",
+            autoHideDelay: 2000
+          }
+        );
+      });
+    });
+  }
+}
 </script>
 
 <style>

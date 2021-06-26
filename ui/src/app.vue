@@ -3,7 +3,7 @@
     <b-navbar type="dark" ref="nav" :class="$root.hiddenControlClasses">
       <b-navbar-brand to="/">
         <img src="/favicon96.png" alt="a dapper fellow" />
-        gunk
+        {{ $root.siteName }}
       </b-navbar-brand>
       <b-navbar-nav>
         <b-nav-item to="/" v-b-tooltip title="Home"
@@ -11,19 +11,19 @@
         </b-nav-item>
         <b-nav-item
           to="/mychannels"
-          v-if="$root.loggedIn"
+          v-if="loggedIn"
           v-b-tooltip.hover
           title="Create a Channel"
           ><b-icon-pencil-fill
         /></b-nav-item>
         <b-nav-form class="ml-2">
           <b-avatar
-            v-for="name in $root.liveChannels"
+            v-for="name in liveChannels"
             button
             rounded
-            @click="$root.pushChannel(name)"
+            @click="pushChannel(name)"
             :key="name"
-            :src="$root.channels[name].thumb"
+            :src="api.channels[name].thumb"
             size="32px"
             class="ml-2"
             v-b-tooltip.hover
@@ -32,27 +32,22 @@
         </b-nav-form>
       </b-navbar-nav>
       <b-navbar-nav class="ml-auto">
-        <b-nav-form v-if="!$root.loggedIn">
-          <b-button size="sm" class="mr-2" @click.prevent="$root.doLogin"
+        <b-nav-form v-if="!loggedIn">
+          <b-button size="sm" class="mr-2" @click.prevent="api.doLogin"
             >Login</b-button
           >
         </b-nav-form>
-        <b-nav-form v-if="$root.loggedIn">
+        <b-nav-form v-if="loggedIn">
           <b-avatar
-            :src="$root.user.avatar"
+            :src="avatar"
             size="32px"
             alt="your avatar"
             class="mr-3"
             button
             v-b-tooltip.hover
-            :title="
-              'Logged in as ' +
-              $root.user.username +
-              '#' +
-              $root.user.discriminator
-            "
+            :title="'Logged in as ' + account"
           />
-          <b-button size="sm" class="mr-sm-2" @click.prevent="$root.doLogout"
+          <b-button size="sm" class="mr-sm-2" @click.prevent="api.doLogout"
             >Logout</b-button
           >
         </b-nav-form>
@@ -61,6 +56,43 @@
     <router-view />
   </div>
 </template>
+
+<script lang="ts">
+import Component, { mixins } from 'vue-class-component';
+import { APIMixin } from './api';
+import Gunk from "./main";
+
+@Component
+export default class App extends mixins(APIMixin) {
+  $root!: Gunk;
+
+  navChannel (name: string) {
+    return { name: 'watch', params: { channel: name } };
+  }
+
+  pushChannel (name: string) {
+    this.$router.push(this.navChannel(name));
+  }
+
+    get loggedIn () { return !!this.api.user?.id }
+    get avatar() { return this.api.user?.avatar }
+    get account() {
+      if (!this.api.user) {
+        return "";
+      }
+      return this.api.user.username + "#" + this.api.user.discriminator;
+    }
+    get liveChannels () {
+        const live = [];
+        for (const ch of Object.values(this.api.channels)) {
+            if (ch.live) {
+                live.push(ch.name);
+            }
+        }
+        return live.sort();
+    }
+}
+</script>
 
 <style>
 @import url("https://fonts.googleapis.com/css2?family=Montserrat&family=Special+Elite&display=swap");

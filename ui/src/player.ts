@@ -1,16 +1,17 @@
 // import Hls from 'hls.js/dist/hls';
-import { MediaPlayer } from 'dashjs';
+import dashjs, { MediaPlayer } from 'dashjs';
+import WSSession from './ws';
 
 // play video when ready and restore and save volume
-function autoplay (video) {
+function autoplay (video: HTMLVideoElement) {
   video.onvolumechange = null;
   video.muted = true;
   let forcedMute = false;
   video.onplay = function () {
     // update saved volume once playing, after we're done testing whether we can unmute
     video.onvolumechange = () => {
-      localStorage.setItem('unmute', !video.muted);
-      localStorage.setItem('volume', Math.round(video.volume * 100));
+      localStorage.setItem('unmute', String(!video.muted));
+      localStorage.setItem('volume', String(Math.round(video.volume * 100)));
     };
     if (!forcedMute) {
       video.onclick = null;
@@ -31,7 +32,7 @@ function autoplay (video) {
   video.oncanplay = function () {
     video.oncanplay = null;
     // restore saved volume
-    const vol = localStorage.getItem('volume');
+    const vol = Number(localStorage.getItem('volume'));
     if (vol) {
       video.volume = vol / 100;
     }
@@ -112,27 +113,30 @@ export function nativeRequired () {
 }
 
 export class NativePlayer {
-  constructor (video, webURL) {
+  video: HTMLVideoElement;
+
+  constructor (video: HTMLVideoElement, webURL: string) {
     autoplay(video);
     this.video = video;
     video.src = webURL;
   }
 
-  destroy () {
-    this.video = null;
-  }
+  destroy () { }
 
   seekLive () {
     this.video.play();
   }
 
   latencyTo () {
-    return null;
+    return 0;
   }
 }
 
 export class DASHPlayer {
-  constructor (video, webURL, lowLatencyMode) {
+  video: HTMLVideoElement;
+  stream: dashjs.MediaPlayerClass;
+
+  constructor (video: HTMLVideoElement, webURL: string, lowLatencyMode: boolean) {
     autoplay(video);
     this.video = video;
     this.stream = MediaPlayer().create();
@@ -140,7 +144,9 @@ export class DASHPlayer {
     this.stream.updateSettings({
       streaming: {
         lowLatencyEnabled: lowLatencyMode,
-        liveDelayFragmentCount: 1,
+        delay: {
+          liveDelay: 2,
+        },
         liveCatchup: {
           playbackRate: 0.1,
           minDrift: 0.1
@@ -156,27 +162,27 @@ export class DASHPlayer {
   }
 
   destroy () {
-    this.video = null;
-    if (this.stream !== null) {
-      this.stream.reset();
-    }
+    this.stream.reset();
   }
 
   seekLive () {
-    this.video.play();
+    this.stream.seek(this.stream.duration());
+    this.stream.play();
   }
 
   latencyTo () {
-    if (this.stream !== null) {
-      return [this.stream.getCurrentLiveLatency(), true];
-    }
-    return null;
+    return this.stream.getCurrentLiveLatency();
   }
 }
 
 export class RTCPlayer {
-  constructor (video, ws, channel) {
+  video: HTMLVideoElement;
+  pc: RTCPeerConnection;
+  ws: WSSession;
+
+  constructor (video: HTMLVideoElement, ws: WSSession, channel: string) {
     autoplay(video);
+    this.video = video;
     this.pc = new RTCPeerConnection({
       iceServers: [{
         urls: [
@@ -198,19 +204,27 @@ export class RTCPlayer {
     const ms = new MediaStream();
     this.pc.ontrack = function (ev) {
       ms.addTrack(ev.track);
+
       if ('srcObject' in video) {
         video.srcObject = ms;
       } else {
+        // @ts-ignore-next-line
         video.src = URL.createObjectURL(ms);
       }
     };
-    this.pc.addEventListener('icecandidate', (ev) => ws.candidate(ev.candidate));
-    ws.onCandidate = (cand) => this.pc.addIceCandidate(cand);
+    this.pc.addEventListener('icecandidate', (ev) => {
+      if (ev.candidate) {
+        ws.candidate(ev.candidate);
+      }
+    });
+    ws.onCandidate = (cand: RTCIceCandidateInit) => this.pc.addIceCandidate(cand);
     // request an offer
     ws.play(channel)
-      .then((offer) => this.pc.setRemoteDescription(new RTCSessionDescription(offer)))
+      .then((offer: RTCSessionDescriptionInit) => {
+        this.pc.setRemoteDescription(new RTCSessionDescription(offer));
+      })
       .then(() => this.pc.createAnswer(offerArgs))
-      .then((answer) => {
+      .then((answer: RTCSessionDescriptionInit) => {
         this.ws.answer(answer);
         this.pc.setLocalDescription(answer);
       });
@@ -218,21 +232,15 @@ export class RTCPlayer {
   }
 
   destroy () {
-    if (this.ws !== null) {
-      this.ws.stop();
-      this.ws = null;
-    }
-    if (this.pc !== null) {
-      this.pc.close();
-      this.pc = null;
-    }
+    this.ws.stop();
+    this.pc.close();
   }
 
   seekLive () {
-    this.player.play();
+    this.video.play();
   }
 
   latencyTo () {
-    return [0, true];
+    return 0;
   }
 }
