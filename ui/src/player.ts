@@ -1,6 +1,6 @@
 // import Hls from 'hls.js/dist/hls';
 import dashjs, { MediaPlayer } from 'dashjs';
-import WSSession from './ws';
+import ws from './ws';
 
 // play video when ready and restore and save volume
 function autoplay (video: HTMLVideoElement) {
@@ -156,7 +156,7 @@ export class DASHPlayer {
         }
       }
     });
-    this.stream.setAutoPlay(false);
+    this.stream.setAutoPlay(true);
     this.stream.attachSource(webURL);
     this.stream.attachView(video);
   }
@@ -178,9 +178,8 @@ export class DASHPlayer {
 export class RTCPlayer {
   video: HTMLVideoElement;
   pc: RTCPeerConnection;
-  ws: WSSession;
 
-  constructor (video: HTMLVideoElement, ws: WSSession, channel: string) {
+  constructor (video: HTMLVideoElement, channel: string) {
     autoplay(video);
     this.video = video;
     this.pc = new RTCPeerConnection({
@@ -196,7 +195,7 @@ export class RTCPlayer {
     try {
       this.pc.addTransceiver('audio', { direction: 'recvonly' });
       this.pc.addTransceiver('video', { direction: 'recvonly' });
-    } catch (error) {
+    } catch {
       // backwards compat
       offerArgs = { offerToReceiveVideo: true, offerToReceiveAudio: true };
     }
@@ -225,14 +224,13 @@ export class RTCPlayer {
       })
       .then(() => this.pc.createAnswer(offerArgs))
       .then((answer: RTCSessionDescriptionInit) => {
-        this.ws.answer(answer);
+        ws.answer(answer);
         this.pc.setLocalDescription(answer);
       });
-    this.ws = ws;
   }
 
   destroy () {
-    this.ws.stop();
+    ws.stop();
     this.pc.close();
   }
 

@@ -26,15 +26,13 @@
 </template>
 
 <script lang="ts">
-import Component, { mixins } from "vue-class-component";
+import Vue from "vue";
+import Component from "vue-class-component";
 import { BIconEyeFill } from "bootstrap-vue";
-import { APIMixin } from "../api";
 import channels from "@/store/channels";
 
-@Component({
-  components: { BIconEyeFill },
-})
-export default class Home extends mixins(APIMixin) {
+@Component({ components: { BIconEyeFill } })
+export default class Home extends Vue {
   navChannel (name: string) {
     return { name: 'watch', params: { channel: name } };
   }

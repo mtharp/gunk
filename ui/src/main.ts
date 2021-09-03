@@ -2,7 +2,6 @@ import Vue from 'vue';
 import App from './app.vue';
 import router from './router';
 import ControlsHider from './components/controls-hider.vue';
-import { APIMixin } from './api';
 import store from './store';
 import channels from './store/channels';
 import userinfo from './store/userinfo';
@@ -12,6 +11,7 @@ import 'bootstrap-vue/dist/bootstrap-vue.css';
 import { BootstrapVue, BootstrapVueIcons } from 'bootstrap-vue';
 import VueTimeago from 'vue-timeago';
 import Component, { mixins } from 'vue-class-component';
+import ws from './ws';
 
 Vue.use(BootstrapVue);
 Vue.use(BootstrapVueIcons);
@@ -28,7 +28,7 @@ Vue.config.productionTip = false;
     }
   },
 })
-export default class Gunk extends mixins(ControlsHider, APIMixin) {
+export default class Gunk extends mixins(ControlsHider) {
   rtcSelected = localStorage.getItem('playerType') === 'RTC';
   lowLatency = localStorage.getItem('lowLatency') !== 'false';
   readonly siteName = process.env.VUE_APP_SITE_NAME;
@@ -37,10 +37,11 @@ export default class Gunk extends mixins(ControlsHider, APIMixin) {
     channels.refreshChannels();
     userinfo.refreshUserInfo();
     window.setInterval(userinfo.refreshUserInfo, 300000);
-    this.api.connect();
+    ws.onChannel = (ch) => channels.putChannel(ch);
+    ws.open();
   }
   beforeDestroy () {
-    this.api.disconnect();
+    ws.close();
   }
 }
 

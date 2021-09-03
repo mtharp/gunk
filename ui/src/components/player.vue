@@ -167,7 +167,6 @@
 import Vue, { PropType } from "vue";
 import Component, { mixins } from "vue-class-component";
 import VueSlider from "vue-slider-component";
-import { APIMixin } from "../api";
 import { ChannelInfo } from "@/store/channels";
 import Gunk from "../main";
 import "vue-slider-component/theme/default.css";
@@ -191,7 +190,7 @@ const PlayerProps = Vue.extend({
 @Component({
   components: { VueSlider }
 })
-export default class Player extends mixins(PlayerProps, APIMixin) {
+export default class Player extends mixins(PlayerProps) {
   player?: PlayerProvider;
   hasFullscreen = document.fullscreenEnabled;
   isFullscreen = document.fullscreenElement !== null;
@@ -223,8 +222,8 @@ export default class Player extends mixins(PlayerProps, APIMixin) {
   mounted() {
     document.addEventListener("keydown", this.onKey);
     let video = this.$refs.video;
-    if (this.rtcActive && this.api.ws) {
-      this.player = new RTCPlayer(video, this.api.ws, this.ch.name);
+    if (this.rtcActive) {
+      this.player = new RTCPlayer(video, this.ch.name);
       this.atTail = true;
     } else if (nativeRequired()) {
       this.player = new NativePlayer(video, this.nativeURL);
