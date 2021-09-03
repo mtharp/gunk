@@ -25,7 +25,6 @@
 import channels from "@/store/channels";
 import Vue from "vue";
 import Component, { mixins } from 'vue-class-component';
-import { APIMixin } from "../api";
 import Player from "../components/player.vue";
 import Gunk from "../main";
 
@@ -38,7 +37,7 @@ const WatchProps = Vue.extend({
 @Component({
   components: { Player },
 })
-export default class Watch extends mixins(WatchProps, APIMixin) {
+export default class Watch extends mixins(WatchProps) {
   $root!: Gunk;
   
     get chInfo() {

@@ -58,14 +58,14 @@
 </template>
 
 <script lang="ts">
-import Component, { mixins } from 'vue-class-component';
-import { APIMixin } from './api';
+import Vue from 'vue';
+import Component from 'vue-class-component';
 import Gunk from "./main";
 import channels from './store/channels';
 import userinfo from './store/userinfo';
 
 @Component
-export default class App extends mixins(APIMixin) {
+export default class App extends Vue {
   $root!: Gunk;
 
   navChannel (name: string) {

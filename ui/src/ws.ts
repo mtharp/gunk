@@ -3,9 +3,9 @@ import { ChannelInfo } from "@/store/channels";
 const initialDelay = 100;
 const maxDelay = 10000;
 
-export default class WSSession {
+export class WSSession {
   wsURL: string;
-  last: number;
+  last = 0;
   session = "";
   delay = initialDelay;
 
@@ -23,6 +23,9 @@ export default class WSSession {
       wsURL += ':' + loc.port;
     }
     this.wsURL = wsURL + '/ws';
+  }
+
+  open() {
     this.delay = initialDelay;
     this.last = performance.now();
     this.ping = window.setInterval(() => this.doPing(), 10000);
@@ -138,3 +141,5 @@ export default class WSSession {
     this.sendMsg({ type: 'stop' });
   }
 }
+
+export default new WSSession(location);
