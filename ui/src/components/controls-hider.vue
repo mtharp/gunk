@@ -40,11 +40,11 @@ export default class ControlsHider extends Vue {
     }
   }
   // called by a player when it mounts, remember its unique key
-  startHidingControls(key: string | number | undefined) {
+  startHidingControls(key: any) {
     this.hidingControls = key;
   }
   // when a player unmounts, stop hiding controls unless a different player mounted first
-  stopHidingControls(key: string | number | undefined) {
+  stopHidingControls(key: any) {
     if (this.hidingControls === key) {
       this.hidingControls = undefined;
     }

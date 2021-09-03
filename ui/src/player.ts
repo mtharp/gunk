@@ -109,7 +109,7 @@ function autoplay (video: HTMLVideoElement) {
 
 // test for iOS, which only supports RTC and native HLS
 export function nativeRequired () {
-  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !("MSStream" in window);
 }
 
 export class NativePlayer {

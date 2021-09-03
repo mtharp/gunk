@@ -8,3 +8,6 @@ updates:
     directory: /ui
     schedule:
       interval: daily
+    ignore:
+      # newer versions don't work with the webpack vue-cli wants
+      - dependency-name: compression-webpack-plugin
