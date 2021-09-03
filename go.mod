@@ -14,9 +14,9 @@ require (
 	github.com/jackc/pgx v3.6.2+incompatible
 	github.com/lib/pq v1.10.1 // indirect
 	github.com/nareix/joy4 v0.0.0-20200507095837-05a4ffbb5369
-	github.com/pion/ice/v2 v2.1.7
+	github.com/pion/ice/v2 v2.1.10
 	github.com/pion/rtp v1.6.5
-	github.com/pion/webrtc/v3 v3.0.29
+	github.com/pion/webrtc/v3 v3.0.32
 	github.com/shopspring/decimal v1.2.0 // indirect
 	github.com/stretchr/testify v1.7.0
 	golang.org/x/crypto v0.0.0-20210506145944-38f3c27a63bf
