@@ -15,6 +15,7 @@ import (
 	"eaglesong.dev/gunk/ingest/irtmp"
 	"eaglesong.dev/gunk/model"
 	"eaglesong.dev/gunk/web"
+	"github.com/joho/godotenv"
 	"github.com/nareix/joy4/format/rtmp"
 	"golang.org/x/sync/errgroup"
 
@@ -24,6 +25,8 @@ import (
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 	rand.Seed(time.Now().UnixNano())
+	_ = godotenv.Load(".env")
+	_ = godotenv.Load(".env.local")
 	base := strings.TrimSuffix(os.Getenv("BASE_URL"), "/")
 	u, err := url.Parse(base)
 	if err != nil {

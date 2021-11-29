@@ -1,5 +1,5 @@
 // import Hls from 'hls.js/dist/hls';
-import dashjs, { MediaPlayer } from 'dashjs';
+import dashjs, { MediaPlayer, MediaPlayerSettingClass } from 'dashjs';
 import ws from './ws';
 
 // play video when ready and restore and save volume
@@ -141,12 +141,10 @@ export class DASHPlayer {
     this.video = video;
     this.stream = MediaPlayer().create();
     this.stream.initialize();
-    this.stream.updateSettings({
+    const settings: MediaPlayerSettingClass = {
       streaming: {
         lowLatencyEnabled: lowLatencyMode,
-        delay: {
-          liveDelay: 2,
-        },
+        lowLatencyEnabledByManifest: false,
         liveCatchup: {
           playbackRate: 0.1,
           minDrift: 0.1
@@ -155,7 +153,13 @@ export class DASHPlayer {
           timeBetweenSyncAttempts: 30
         }
       }
-    });
+    };
+    if (lowLatencyMode) {
+      settings.streaming!.delay = {liveDelay: 2};
+    } else {
+      settings.streaming!.delay = {liveDelayFragmentCount: 2};
+    }
+    this.stream.updateSettings(settings);
     this.stream.setAutoPlay(true);
     this.stream.attachSource(webURL);
     this.stream.attachView(video);

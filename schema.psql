@@ -1,0 +1,106 @@
+--
+-- PostgreSQL database dump
+--
+
+-- Dumped from database version 13.4 (Debian 13.4-4.pgdg110+1)
+-- Dumped by pg_dump version 14.0
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: channel_defs; Type: TABLE; Schema: public; Owner: gunk
+--
+
+CREATE TABLE public.channel_defs (
+    user_id text NOT NULL,
+    name text NOT NULL,
+    key text NOT NULL,
+    announce boolean DEFAULT true NOT NULL,
+    ftl_id text
+);
+
+
+ALTER TABLE public.channel_defs OWNER TO gunk;
+
+--
+-- Name: thumbs; Type: TABLE; Schema: public; Owner: gunk
+--
+
+CREATE TABLE public.thumbs (
+    name text NOT NULL,
+    thumb bytea NOT NULL,
+    updated timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.thumbs OWNER TO gunk;
+
+--
+-- Name: users; Type: TABLE; Schema: public; Owner: gunk
+--
+
+CREATE TABLE public.users (
+    user_id text NOT NULL,
+    refresh_token text NOT NULL,
+    announce boolean DEFAULT false NOT NULL
+);
+
+
+ALTER TABLE public.users OWNER TO gunk;
+
+--
+-- Name: channel_defs channel_defs_pkey; Type: CONSTRAINT; Schema: public; Owner: gunk
+--
+
+ALTER TABLE ONLY public.channel_defs
+    ADD CONSTRAINT channel_defs_pkey PRIMARY KEY (name);
+
+
+--
+-- Name: thumbs thumbs_pkey; Type: CONSTRAINT; Schema: public; Owner: gunk
+--
+
+ALTER TABLE ONLY public.thumbs
+    ADD CONSTRAINT thumbs_pkey PRIMARY KEY (name);
+
+
+--
+-- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: gunk
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_pkey PRIMARY KEY (user_id);
+
+
+--
+-- Name: channel_defs_user_idx; Type: INDEX; Schema: public; Owner: gunk
+--
+
+CREATE INDEX channel_defs_user_idx ON public.channel_defs USING btree (user_id);
+
+
+--
+-- Name: thumbs thumbs_name_fkey; Type: FK CONSTRAINT; Schema: public; Owner: gunk
+--
+
+ALTER TABLE ONLY public.thumbs
+    ADD CONSTRAINT thumbs_name_fkey FOREIGN KEY (name) REFERENCES public.channel_defs(name) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- PostgreSQL database dump complete
+--
+
