@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"runtime"
 	"time"
@@ -13,6 +12,8 @@ import (
 	"eaglesong.dev/gunk/model"
 	"github.com/gorilla/websocket"
 	"github.com/pion/webrtc/v3"
+	"github.com/rs/zerolog/hlog"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -38,7 +39,7 @@ type wsMsg struct {
 func (s *Server) serveWS(rw http.ResponseWriter, req *http.Request) {
 	conn, err := wsu.Upgrade(rw, req, nil)
 	if err != nil {
-		log.Println("error: websocket upgrade:", err)
+		hlog.FromRequest(req).Err(err).Msg("websocket upgrade failed")
 		return
 	}
 	ctx, cancel := context.WithCancel(req.Context())
@@ -59,14 +60,13 @@ func (s *Server) serveWS(rw http.ResponseWriter, req *http.Request) {
 		s.wsDisconnected(n, w)
 		conn.Close()
 		return nil
-
 	})
 	n.send <- wsMsg{
 		Type: "connected",
 		ID:   n.ID,
 	}
 	if err := eg.Wait(); err != nil && err != io.EOF {
-		log.Printf("error: websocket %s: %s", conn.RemoteAddr(), err)
+		hlog.FromRequest(req).Err(err).Msg("websocket error")
 	}
 }
 
@@ -75,7 +75,7 @@ func (w *wsConn) recvLoop(ctx context.Context) (err error) {
 		if err2 := recover(); err2 != nil {
 			buf := make([]byte, 1e5)
 			buf = buf[:runtime.Stack(buf, false)]
-			log.Printf("uncaught panic in handler: %+v\n%s", err2, string(buf))
+			log.Ctx(ctx).Error().Interface("error", err2).Str("stack", string(buf)).Msg("uncaught panic in handler")
 			if err != nil {
 				err = errors.New("panic caught")
 			}
@@ -89,7 +89,7 @@ func (w *wsConn) recvLoop(ctx context.Context) (err error) {
 			}
 			break
 		}
-		if err := w.handle(m); err != nil {
+		if err := w.handle(ctx, m); err != nil {
 			return err
 		}
 	}
@@ -101,7 +101,7 @@ func (w *wsConn) sendLoop(ctx context.Context) (err error) {
 		if err2 := recover(); err2 != nil {
 			buf := make([]byte, 1e5)
 			buf = buf[:runtime.Stack(buf, false)]
-			log.Printf("uncaught panic in handler: %+v\n%s", err2, string(buf))
+			log.Ctx(ctx).Error().Interface("error", err2).Str("stack", string(buf)).Msg("uncaught panic in handler")
 			if err != nil {
 				err = errors.New("panic caught")
 			}
@@ -123,7 +123,7 @@ func (w *wsConn) sendLoop(ctx context.Context) (err error) {
 		case <-t.C:
 			changed, err := w.server.listChannels(markers)
 			if err != nil {
-				log.Println("error: listing channels:", err)
+				log.Ctx(ctx).Err(err).Msg("failed listing channels")
 			}
 			for _, ch := range changed {
 				msg := wsMsg{Type: "channel", Channel: ch}
@@ -142,10 +142,10 @@ func (w *wsConn) sendLoop(ctx context.Context) (err error) {
 	return nil
 }
 
-func (w *wsConn) handle(m wsMsg) error {
+func (w *wsConn) handle(ctx context.Context, m wsMsg) error {
 	switch m.Type {
 	case "play":
-		return w.session.Play(m.Name, w.conn.RemoteAddr().String())
+		return w.session.Play(ctx, m.Name)
 	case "candidate":
 		return w.session.Candidate(m.Candidate)
 	case "answer":

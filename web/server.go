@@ -3,14 +3,16 @@ package web
 import (
 	"encoding/json"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"sync"
 
 	"eaglesong.dev/gunk/ingest"
 	"eaglesong.dev/gunk/model"
 	"github.com/gorilla/mux"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/hlog"
 	"golang.org/x/oauth2"
 )
 
@@ -71,8 +73,10 @@ func (s *Server) Handler() http.Handler {
 	r.HandleFunc("/api/mychannels/{name}", s.viewDefsDelete).Methods("DELETE")
 	r.HandleFunc("/health", s.viewHealth).Methods("GET")
 	h := noCache(r)
-	h = accessLog(h)
+	h = hlog.AccessHandler(accessLog)(h)
 	h = realIPMiddleware(h)
+	access := zerolog.New(os.Stderr)
+	h = hlog.NewHandler(access)(h)
 	return h
 }
 
@@ -86,20 +90,20 @@ func (s *Server) checkAuth(rw http.ResponseWriter, req *http.Request) string {
 	if err == nil {
 		return info.ID
 	}
-	log.Printf("error: authentication failed for %s to %s", req.RemoteAddr, req.URL)
-	http.Error(rw, "not authorized", 401)
+	hlog.FromRequest(req).Err(err).Msg("authentication failed")
+	http.Error(rw, "not authorized", http.StatusUnauthorized)
 	return ""
 }
 
 func parseRequest(rw http.ResponseWriter, req *http.Request, d interface{}) bool {
 	blob, err := ioutil.ReadAll(req.Body)
 	if err != nil {
-		log.Printf("error: reading %s request: %s", req.RemoteAddr, err)
+		hlog.FromRequest(req).Err(err).Msg("error reading request")
 		http.Error(rw, "", 500)
 		return false
 	}
 	if err := json.Unmarshal(blob, d); err != nil {
-		log.Printf("error: reading %s request: %s", req.RemoteAddr, err)
+		hlog.FromRequest(req).Err(err).Msg("error parsing request")
 		http.Error(rw, "invalid JSON in request", 400)
 		return false
 	}

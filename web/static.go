@@ -2,12 +2,13 @@ package web
 
 import (
 	"errors"
-	"log"
 	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/rs/zerolog/hlog"
 )
 
 type staticServer struct {
@@ -30,7 +31,7 @@ func (s staticServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		if err == nil {
 			rw.Header().Set("Content-Encoding", "br")
 		} else if !errors.Is(err, os.ErrNotExist) {
-			log.Println("error:", err)
+			hlog.FromRequest(req).Err(err).Msg("failed serving UI")
 			http.Error(rw, "", http.StatusForbidden)
 			return
 		}
@@ -40,7 +41,7 @@ func (s staticServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		if err == nil {
 			rw.Header().Set("Content-Encoding", "gzip")
 		} else if !errors.Is(err, os.ErrNotExist) {
-			log.Println("error:", err)
+			hlog.FromRequest(req).Err(err).Msg("failed serving UI")
 			http.Error(rw, "", http.StatusForbidden)
 			return
 		}
@@ -51,7 +52,7 @@ func (s staticServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			http.NotFound(rw, req)
 			return
 		} else if err != nil {
-			log.Println("error:", err)
+			hlog.FromRequest(req).Err(err).Msg("failed serving UI")
 			http.Error(rw, "", http.StatusForbidden)
 			return
 		}
@@ -59,7 +60,7 @@ func (s staticServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	defer f.Close()
 	st, err := f.Stat()
 	if err != nil {
-		log.Println("error:", err)
+		hlog.FromRequest(req).Err(err).Msg("failed serving UI")
 		http.Error(rw, "", http.StatusInternalServerError)
 		return
 	} else if st.IsDir() {

@@ -1,7 +1,7 @@
 package irtmp
 
 import (
-	"log"
+	"context"
 	"net"
 	"net/url"
 
@@ -9,6 +9,7 @@ import (
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/av/pktque"
 	"github.com/nareix/joy4/format/rtmp"
+	"github.com/rs/zerolog/log"
 )
 
 type Server struct {
@@ -18,7 +19,7 @@ type Server struct {
 }
 
 type CheckUserFunc func(*url.URL) (model.ChannelAuth, error)
-type PublishFunc func(auth model.ChannelAuth, kind, remoteAddr string, src av.Demuxer) error
+type PublishFunc func(ctx context.Context, auth model.ChannelAuth, src av.Demuxer) error
 
 func (s *Server) ListenAndServe() error {
 	s.HandlePublish = s.handlePublish
@@ -32,12 +33,14 @@ func (s *Server) handlePublish(conn *rtmp.Conn) {
 		Demuxer: conn,
 		Filter:  &DeJitter{},
 	}
+	l := log.With().Str("rtmp_ip", remote).Str("kind", "rtmp").Logger()
+	ctx := l.WithContext(context.Background())
 	auth, err := s.CheckUser(conn.URL)
 	if err != nil {
-		log.Printf("[rtmp] error: %s from %s: %s", conn.URL, remote, err)
+		l.Err(err).Stringer("rtmp_url", conn.URL).Msg("RTMP auth failed")
 		return
 	}
-	if err := s.Publish(auth, "rtmp", remote, fm); err != nil {
-		log.Printf("[rtmp] error: %s from %s: %s", conn.URL, remote, err)
+	if err := s.Publish(ctx, auth, fm); err != nil {
+		l.Err(err).Stringer("rtmp_url", conn.URL).Msg("RTMP publish failed")
 	}
 }

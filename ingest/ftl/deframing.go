@@ -3,13 +3,13 @@ package ftl
 import (
 	"bytes"
 	"errors"
-	"log"
 
 	"eaglesong.dev/gunk/h264util"
 	"eaglesong.dev/gunk/internal"
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/codec/h264parser"
 	"github.com/pion/rtp"
+	"github.com/rs/zerolog/log"
 )
 
 type Deframer struct {
@@ -31,7 +31,7 @@ type Parser interface {
 func (f *Deframer) Deframe(rp *rtp.Packet) ([]av.Packet, error) {
 	seqDelta := rp.SequenceNumber - f.lastSeq
 	if seqDelta != 1 {
-		log.Printf("seq delta %d", int16(seqDelta))
+		log.Warn().Int16("delta", int16(seqDelta)).Msg("unexpected sequence delta")
 	}
 	f.lastSeq = rp.SequenceNumber
 
@@ -51,7 +51,6 @@ func (f *Deframer) Deframe(rp *rtp.Packet) ([]av.Packet, error) {
 
 type H264Parser struct {
 	sps, pps []byte
-	pkt      av.Packet
 	fbuf     bytes.Buffer
 }
 

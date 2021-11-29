@@ -14,6 +14,7 @@ require (
 	github.com/pion/ice/v2 v2.1.14
 	github.com/pion/rtp v1.7.4
 	github.com/pion/webrtc/v3 v3.1.11
+	github.com/rs/zerolog v1.26.0
 	github.com/stretchr/testify v1.7.0
 	golang.org/x/crypto v0.0.0-20211117183948-ae814b36b871
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
@@ -45,6 +46,7 @@ require (
 	github.com/pion/udp v0.1.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/rs/xid v1.3.0 // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
 	golang.org/x/net v0.0.0-20211123203042-d83791d6bcd9 // indirect
 	golang.org/x/sys v0.0.0-20211124211545-fe61309f8881 // indirect

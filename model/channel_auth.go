@@ -4,11 +4,11 @@ import (
 	"crypto/hmac"
 	"crypto/sha512"
 	"encoding/json"
-	"log"
 	"net/url"
 	"path"
 
 	"github.com/jackc/pgx"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/oauth2"
 )
 
@@ -61,7 +61,7 @@ func VerifyFTL(channelID string, nonce, hmacProvided []byte) (auth ChannelAuth, 
 	hm.Write(nonce)
 	expected := hm.Sum(nil)
 	if !hmac.Equal(expected, hmacProvided) {
-		log.Printf("error: hmac digest mismatch for FTL channel %s", auth.Name)
+		log.Error().Str("channel", auth.Name).Msg("hmac digest mismatch in FTL auth")
 		err = ErrUserNotFound
 		return
 	}

@@ -12,6 +12,7 @@ import (
 	"eaglesong.dev/gunk/sinks/playrtc"
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/format/ts"
+	"github.com/rs/zerolog"
 )
 
 var ErrNoChannel = errors.New("channel not found")
@@ -55,7 +56,7 @@ func (m *Manager) ServeWeb(rw http.ResponseWriter, req *http.Request, name strin
 	return nil
 }
 
-func (m *Manager) OfferSDP(name, remoteIP string, sendCandidate playrtc.CandidateSender) (*playrtc.Sender, error) {
+func (m *Manager) OfferSDP(ctx context.Context, name string, sendCandidate playrtc.CandidateSender) (*playrtc.Sender, error) {
 	ch := m.channel(name)
 	if ch == nil {
 		return nil, ErrNoChannel
@@ -65,7 +66,9 @@ func (m *Manager) OfferSDP(name, remoteIP string, sendCandidate playrtc.Candidat
 		return nil, ErrNoChannel
 	}
 	addViewer := func(delta int) { ch.addViewer(int32(delta)) }
-	return m.rtc.OfferToSend(src, addViewer, remoteIP, sendCandidate)
+	l := zerolog.Ctx(ctx).With().Str("channel", name).Logger()
+	ctx = l.WithContext(ctx)
+	return m.rtc.OfferToSend(ctx, src, addViewer, sendCandidate)
 }
 
 func (m *Manager) PopulateLive(infos []*model.ChannelInfo) {

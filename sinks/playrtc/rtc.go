@@ -3,7 +3,6 @@ package playrtc
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
 	"strconv"
 	"strings"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/pion/ice/v2"
 	"github.com/pion/webrtc/v3"
+	"github.com/rs/zerolog/log"
 )
 
 type Engine struct {
@@ -93,7 +93,7 @@ func (e *Engine) newConnection() (*webrtc.PeerConnection, error) {
 				types = append(types, webrtc.NetworkTypeUDP6)
 			}
 		} else {
-			log.Printf("warning: looking up RTC host %s: %+v", e.AdvertiseHost, err)
+			log.Err(err).Str("host", e.AdvertiseHost).Msg("failed looking up RTC host")
 		}
 	}
 	se.SetNetworkTypes(types)

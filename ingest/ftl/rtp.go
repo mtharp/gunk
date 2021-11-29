@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"io"
-	"log"
 	"net"
 	"time"
 
 	"github.com/nareix/joy4/av"
 	"github.com/pion/rtp"
+	"github.com/rs/zerolog/log"
 )
 
 func (s *Server) serveRTP() {
@@ -17,7 +17,7 @@ func (s *Server) serveRTP() {
 		d := make([]byte, 1500)
 		n, addr, err := s.RTPSocket.ReadFrom(d)
 		if err != nil {
-			log.Println("error: receiving from UDP socket:", err)
+			log.Err(err).Msg("failed reading RTP socket")
 			time.Sleep(time.Second)
 			continue
 		}
@@ -48,9 +48,8 @@ func (s *Server) serveRTP() {
 		keyb := make([]byte, len(ip)+4)
 		copy(keyb, ssrc)
 		copy(keyb[4:], ip)
-		key := string(keyb)
 		s.mu.Lock()
-		rcv := s.receivers[key]
+		rcv := s.receivers[string(keyb)]
 		s.mu.Unlock()
 		if rcv == nil {
 			continue

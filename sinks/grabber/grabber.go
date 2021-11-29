@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os/exec"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"eaglesong.dev/gunk/model"
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/codec/h264parser"
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -49,12 +49,13 @@ func Grab(channelName string, dm av.Demuxer) (<-chan Result, error) {
 		var keyTime time.Duration
 		var lastGrab time.Time
 		var lastBframe time.Duration
+		l := log.With().Str("channel", channelName).Logger()
 		for {
 			pkt, err := dm.ReadPacket()
 			if err == io.EOF {
 				return
 			} else if err != nil {
-				log.Printf("error: in frame grabber: %s", err)
+				l.Err(err).Msg("failed to grab frame")
 				return
 			}
 			if int(pkt.Idx) != vidIdx {
@@ -63,7 +64,7 @@ func Grab(channelName string, dm av.Demuxer) (<-chan Result, error) {
 			if buf.Len() != 0 && (!pkt.IsKeyFrame || pkt.Time != keyTime) {
 				if time.Since(lastGrab) >= grabInterval {
 					if err := makeFrame(channelName, vidCodec, buf.Bytes()); err != nil {
-						log.Println("error: making thumbnail:", err)
+						l.Err(err).Msg("failed to make thumbnail")
 					}
 					lastGrab = time.Now()
 					select {

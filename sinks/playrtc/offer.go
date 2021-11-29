@@ -1,14 +1,18 @@
 package playrtc
 
 import (
+	"context"
+
 	"github.com/nareix/joy4/av"
 	"github.com/pion/webrtc/v3"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 type ViewerFunc func(int)
 type CandidateSender func(webrtc.ICECandidateInit)
 
-func (e *Engine) OfferToSend(src av.Demuxer, addViewer ViewerFunc, remoteIP string, sendCandidate CandidateSender) (*Sender, error) {
+func (e *Engine) OfferToSend(ctx context.Context, src av.Demuxer, addViewer ViewerFunc, sendCandidate CandidateSender) (*Sender, error) {
 	// build tracks
 	streams, err := src.Streams()
 	if err != nil {
@@ -22,10 +26,15 @@ func (e *Engine) OfferToSend(src av.Demuxer, addViewer ViewerFunc, remoteIP stri
 		pc:            pc,
 		src:           src,
 		tracks:        make([]*senderTrack, len(streams)),
-		remoteIP:      remoteIP,
 		addViewer:     addViewer,
 		sendCandidate: sendCandidate,
 	}
+	s.log = log.Ctx(ctx).Hook(zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
+		ip, _ := s.lastIP.Load().(string)
+		if ip != "" {
+			e.Str("rtc_ip", ip)
+		}
+	}))
 	if err := s.start(streams); err != nil {
 		pc.Close()
 		return nil, err
@@ -38,7 +47,7 @@ func (s *Sender) SDP() webrtc.SessionDescription {
 }
 
 func (s *Sender) Candidate(candidate webrtc.ICECandidateInit) {
-	// log.Println("got candidate:", candidate.Candidate)
+	log.Debug().Str("rtc_cand_recv", candidate.Candidate).Send()
 	s.pc.AddICECandidate(candidate)
 }
 
@@ -46,9 +55,7 @@ func (s *Sender) SetAnswer(answer webrtc.SessionDescription) error {
 	if err := s.pc.SetRemoteDescription(answer); err != nil {
 		return err
 	}
-	// for _, l := range strings.Split(answer.SDP, "\n") {
-	// 	log.Println(">", l)
-	// }
+	log.Debug().Str("rtc_answer_recv", answer.SDP).Send()
 	// serve in background
 	go s.serve()
 	return nil

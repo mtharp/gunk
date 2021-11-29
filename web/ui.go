@@ -1,7 +1,6 @@
 package web
 
 import (
-	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -11,16 +10,17 @@ import (
 
 	"eaglesong.dev/gunk/ui/src"
 	"github.com/gorilla/mux"
+	"github.com/rs/zerolog/log"
 )
 
 func uiRoutes(r *mux.Router) {
 	uiLoc := os.Getenv("UI")
 	if uiLoc == "" {
-		log.Fatalln("set UI to location of UI, either local path or URL")
+		log.Fatal().Msg("set UI to location of UI, either local path or URL")
 	}
 	u, err := url.Parse(uiLoc)
 	if err != nil {
-		log.Fatalln("error:", err)
+		log.Fatal().Err(err).Msg("failed to parse UI")
 	}
 	var handler http.Handler
 	if u.Scheme != "" {

@@ -2,7 +2,6 @@ package web
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -10,6 +9,7 @@ import (
 	"eaglesong.dev/gunk/model"
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx"
+	"github.com/rs/zerolog/hlog"
 )
 
 func (s *Server) listChannels(m channelMarkers) ([]*model.ChannelInfo, error) {
@@ -50,7 +50,7 @@ func (s *Server) populateChannel(info *model.ChannelInfo) {
 func (s *Server) viewChannelInfo(rw http.ResponseWriter, req *http.Request) {
 	infos, err := s.listChannels(nil)
 	if err != nil {
-		log.Printf("error: listing channels: %s", err)
+		hlog.FromRequest(req).Err(err).Msg("failed listing channels")
 		http.Error(rw, "", 500)
 	}
 	ret := struct {
@@ -75,11 +75,11 @@ func (s *Server) viewThumb(rw http.ResponseWriter, req *http.Request) {
 	chname := mux.Vars(req)["channel"]
 	jpeg, err := model.GetThumb(chname)
 	if err == pgx.ErrNoRows {
-		log.Printf("not found: %s", req.URL)
+		hlog.FromRequest(req).Info().Str("channel", chname).Msg("channel not found")
 		http.NotFound(rw, req)
 		return
 	} else if err != nil {
-		log.Printf("error: getting thumbnail: %s", err)
+		hlog.FromRequest(req).Err(err).Str("channel", chname).Msg("failed to get thumbnail")
 		http.Error(rw, "", 500)
 		return
 	}

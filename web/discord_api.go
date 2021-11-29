@@ -6,12 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"time"
 
 	"eaglesong.dev/gunk/model"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/oauth2"
 )
 
@@ -107,7 +107,7 @@ func (s *Server) doWebhook(auth model.ChannelAuth) error {
 	if auth.Token != nil && (auth.Token.Valid() || auth.Token.RefreshToken != "") {
 		userInfo, err := s.lookupUser(ctx, auth.Token)
 		if err != nil {
-			log.Printf("warning: failed to refresh user %s info: %s", auth.UserID, err)
+			log.Err(err).Str("user_id", auth.UserID).Msg("failed to refresh user info")
 		} else {
 			displayName = userInfo.Username
 		}

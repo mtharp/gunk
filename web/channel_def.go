@@ -2,12 +2,12 @@ package web
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 
 	"eaglesong.dev/gunk/model"
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx"
+	"github.com/rs/zerolog/hlog"
 )
 
 type defsResponse struct {
@@ -22,7 +22,7 @@ func (s *Server) viewDefs(rw http.ResponseWriter, req *http.Request) {
 	}
 	defs, err := model.ListChannelDefs(userID)
 	if err != nil {
-		log.Println("error:", err)
+		hlog.FromRequest(req).Err(err).Msg("failed listing channels")
 		http.Error(rw, "", 500)
 	}
 	for _, def := range defs {
@@ -72,7 +72,7 @@ func (s *Server) viewDefsCreate(rw http.ResponseWriter, req *http.Request) {
 			http.Error(rw, "channel name already in use", http.StatusConflict)
 			return
 		}
-		log.Printf("error: creating channel %q for %s: %s", dr.Name, req.RemoteAddr, err)
+		hlog.FromRequest(req).Err(err).Str("channel", dr.Name).Msg("failed to create channel")
 		http.Error(rw, "", 500)
 		return
 	}
@@ -95,7 +95,7 @@ func (s *Server) viewDefsUpdate(rw http.ResponseWriter, req *http.Request) {
 	}
 	name := mux.Vars(req)["name"]
 	if err := model.UpdateChannel(userID, name, du.Announce); err != nil {
-		log.Printf("error: updating channel %q for %s: %s", name, req.RemoteAddr, err)
+		hlog.FromRequest(req).Err(err).Str("channel", name).Msg("failed to update channel")
 		http.Error(rw, "", 500)
 		return
 	}
@@ -109,7 +109,7 @@ func (s *Server) viewDefsDelete(rw http.ResponseWriter, req *http.Request) {
 	}
 	name := mux.Vars(req)["name"]
 	if err := model.DeleteChannel(userID, name); err != nil {
-		log.Printf("error: deleting channel %q for %s: %s", name, req.RemoteAddr, err)
+		hlog.FromRequest(req).Err(err).Str("channel", name).Msg("failed to delete channel")
 		return
 	}
 	writeJSON(rw, nil)

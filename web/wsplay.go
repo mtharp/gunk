@@ -1,13 +1,14 @@
 package web
 
 import (
+	"context"
 	"errors"
 	"sync"
 
 	"github.com/pion/webrtc/v3"
 )
 
-func (n *wsSession) Play(name, remoteIP string) error {
+func (n *wsSession) Play(ctx context.Context, name string) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	if n.rtc != nil {
@@ -33,7 +34,7 @@ func (n *wsSession) Play(name, remoteIP string) error {
 		}
 		mu.Unlock()
 	}
-	s, err := n.server.Channels.OfferSDP(name, remoteIP, cand)
+	s, err := n.server.Channels.OfferSDP(ctx, name, cand)
 	if err != nil {
 		return err
 	}

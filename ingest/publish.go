@@ -4,26 +4,41 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"sync/atomic"
 	"time"
 
+	"eaglesong.dev/gunk/internal"
 	"eaglesong.dev/gunk/model"
 	"eaglesong.dev/gunk/sinks/grabber"
 	"eaglesong.dev/gunk/transcode/opus"
 	"eaglesong.dev/hls"
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/av/pubsub"
+	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 )
 
 const webExpiry = 60 * time.Second
 
-func (m *Manager) Publish(auth model.ChannelAuth, kind, remote string, src av.Demuxer) error {
+func (m *Manager) Publish(ctx context.Context, auth model.ChannelAuth, src av.Demuxer) error {
 	name := auth.Name
+	l := zerolog.Ctx(ctx)
+	l.UpdateContext(func(c zerolog.Context) zerolog.Context {
+		c = c.Str("channel", auth.Name)
+		c = c.Str("user_id", auth.UserID)
+		return c
+	})
 	streams, err := src.Streams()
 	if err != nil {
 		return fmt.Errorf("reading streams: %w", err)
+	}
+	// log stream configuration
+	for i, cd := range streams {
+		ev := l.Debug().Int("idx", i).Stringer("codec", cd.Type())
+		if ev.Enabled() {
+			internal.CodecTag(cd, ev)
+			ev.Send()
+		}
 	}
 	q := pubsub.NewQueue()
 	q.WriteHeader(streams)
@@ -50,14 +65,14 @@ func (m *Manager) Publish(auth model.ChannelAuth, kind, remote string, src av.De
 	ch := v.(*channel)
 	p := ch.setStream(q, aacq, opusq, m.WorkDir)
 	defer func() {
-		log.Printf("[%s] publish of %s stopped", kind, auth.Name)
+		l.Info().Msg("stopped publishing")
 		ch.stopStream(q)
 		if m.PublishEvent != nil {
 			m.PublishEvent(auth, false, grabber.Result{})
 		}
 	}()
 	// announce
-	log.Printf("[%s] user %s started publishing to %s from %s", kind, auth.UserID, auth.Name, remote)
+	l.Info().Msg("started publishing")
 	if m.PublishEvent != nil {
 		m.PublishEvent(auth, true, grabber.Result{})
 	}

@@ -6,9 +6,9 @@ import (
 	"encoding/base64"
 	"errors"
 	"io"
-	"log"
 	"net/http"
 
+	"github.com/rs/zerolog/hlog"
 	"golang.org/x/oauth2"
 )
 
@@ -46,7 +46,7 @@ func (s *Server) viewUser(rw http.ResponseWriter, req *http.Request) {
 
 func (s *Server) viewOauthLogin(rw http.ResponseWriter, req *http.Request) {
 	if s.oauth.ClientID == "" {
-		http.Error(rw, "oauth not configured", 400)
+		http.Error(rw, "oauth not configured", http.StatusBadRequest)
 		return
 	}
 	sb := make([]byte, 9)
@@ -60,24 +60,24 @@ func (s *Server) viewOauthLogin(rw http.ResponseWriter, req *http.Request) {
 
 func (s *Server) viewOauthCB(rw http.ResponseWriter, req *http.Request) {
 	if s.oauth.ClientID == "" {
-		http.Error(rw, "oauth not configured", 400)
+		http.Error(rw, "oauth not configured", http.StatusBadRequest)
 		return
 	}
 	token, err := s.tokenExchange(rw, req)
 	if err != nil {
-		log.Printf("[oauth] error: %s: %s", req.RemoteAddr, err)
-		http.Error(rw, "oauth failure", 400)
+		hlog.FromRequest(req).Err(err).Msg("oauth exchange failed")
+		http.Error(rw, "oauth failure", http.StatusBadRequest)
 		return
 	}
 	user, err := s.lookupUser(req.Context(), token)
 	if err != nil {
-		log.Printf("[oauth] error: %s: %s", req.RemoteAddr, err)
-		http.Error(rw, "error getting user info from discord", 400)
+		hlog.FromRequest(req).Err(err).Msg("failed to get user info")
+		http.Error(rw, "error getting user info from discord", http.StatusBadRequest)
 		return
 	}
 	if err := s.setCookie(rw, loginCookie, user, loginCookieExpires); err != nil {
-		log.Printf("[oauth] error: persisting login: %s", err)
-		http.Error(rw, "error setting login cookie", 500)
+		hlog.FromRequest(req).Err(err).Str("user_id", user.ID).Msg("failed to persist user info")
+		http.Error(rw, "error setting login cookie", http.StatusInternalServerError)
 		return
 	}
 	http.Redirect(rw, req, "/", http.StatusFound)

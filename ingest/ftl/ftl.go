@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"net/textproto"
 	"runtime"
@@ -14,6 +13,8 @@ import (
 
 	"eaglesong.dev/gunk/model"
 	"github.com/nareix/joy4/av"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 type Server struct {
@@ -29,7 +30,7 @@ type Server struct {
 }
 
 type CheckUserFunc func(channelID string, nonce, hmacProvided []byte) (auth model.ChannelAuth, err error)
-type PublishFunc func(auth model.ChannelAuth, kind, remoteAddr string, src av.Demuxer) error
+type PublishFunc func(ctx context.Context, auth model.ChannelAuth, src av.Demuxer) error
 
 func (s *Server) Listen(addr string) (err error) {
 	if addr == "" {
@@ -51,13 +52,15 @@ func (s *Server) Serve() error {
 	for {
 		conn, err := s.Listener.Accept()
 		if err != nil {
-			log.Println("error: accepting FTL connection:", err)
+			log.Err(err).Msg("error accepting FTL connection")
 			time.Sleep(time.Second)
 			continue
 		}
+		l := log.With().Stringer("ftl_ip", conn.RemoteAddr()).Logger()
 		c := &Conn{
 			s:    s,
 			conn: conn,
+			log:  l,
 		}
 		go func() {
 			defer func() {
@@ -65,12 +68,12 @@ func (s *Server) Serve() error {
 					const size = 64 << 10
 					buf := make([]byte, size)
 					buf = buf[:runtime.Stack(buf, false)]
-					log.Printf("error: panic in handler for FTL connection %s: %s\n%s\n", conn.RemoteAddr(), r, string(buf))
+					l.Error().Interface("error", r).Str("stack", string(buf)).Msg("panic in handler for FTL connection")
 				}
 				conn.Close()
 			}()
 			if err := c.serve(); err != nil {
-				log.Printf("error: handling FTL connection from %s: %s", conn.RemoteAddr(), err)
+				l.Err(err).Msg("unhandled error in FTL connection")
 			}
 		}()
 	}
@@ -91,6 +94,7 @@ type Conn struct {
 	tpc    *textproto.Conn
 	ctx    context.Context
 	cancel context.CancelFunc
+	log    zerolog.Logger
 
 	state connState
 	nonce []byte
@@ -136,7 +140,7 @@ func (c *Conn) serve() error {
 		case "CONNECT":
 			err = c.handleConnect(words)
 		case "DISCONNECT":
-			log.Printf("[ftl] %s disconnected cleanly", c.conn.RemoteAddr())
+			c.log.Info().Msg("source disconnected")
 			c.sendOK()
 			return nil
 		case "PING":

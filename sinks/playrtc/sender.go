@@ -3,12 +3,12 @@ package playrtc
 import (
 	"fmt"
 	"io"
-	"log"
 	"sync/atomic"
 	"time"
 
 	"github.com/nareix/joy4/av"
 	"github.com/pion/webrtc/v3"
+	"github.com/rs/zerolog"
 )
 
 type Sender struct {
@@ -18,21 +18,27 @@ type Sender struct {
 	tracks []*senderTrack
 	sdp    webrtc.SessionDescription
 
-	remoteIP      string
 	addViewer     ViewerFunc
 	sendCandidate CandidateSender
+	log           zerolog.Logger
+	lastIP        atomic.Value
 }
 
 func (s *Sender) start(streams []av.CodecData) error {
 	// setup callbacks
 	s.pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
-		log.Printf("[rtc] %s connection state: %s", s.remoteIP, state)
+		if state == webrtc.ICEConnectionStateConnected {
+			if ip := s.remoteIP(); ip != "" {
+				s.lastIP.Store(ip)
+			}
+		}
 		atomic.StoreUintptr(&s.state, uintptr(state))
+		s.log.Info().Stringer("rtc_state", state).Send()
 	})
 	s.pc.OnICECandidate(func(candidate *webrtc.ICECandidate) {
 		if candidate != nil {
 			c := candidate.ToJSON()
-			// log.Println("sending candidate:", c.Candidate)
+			s.log.Debug().Str("rtc_cand_sent", c.Candidate).Send()
 			s.sendCandidate(c)
 		}
 	})
@@ -58,11 +64,27 @@ func (s *Sender) start(streams []av.CodecData) error {
 		s.Close()
 		return err
 	}
-	// for _, l := range strings.Split(offer.SDP, "\n") {
-	// 	log.Println("<", l)
-	// }
+	s.log.Debug().Str("rtc_offer_sent", offer.SDP).Send()
 	s.sdp = offer
 	return nil
+}
+
+func (s *Sender) remoteIP() string {
+	for _, t := range s.pc.GetTransceivers() {
+		send := t.Sender()
+		if send == nil {
+			continue
+		}
+		pair, err := send.Transport().ICETransport().GetSelectedCandidatePair()
+		if err != nil {
+			s.log.Warn().Err(err).Msg("failed to parse candidate pair")
+			continue
+		} else if pair == nil {
+			continue
+		}
+		return pair.Remote.Address
+	}
+	return ""
 }
 
 func (s *Sender) Close() {
@@ -71,7 +93,7 @@ func (s *Sender) Close() {
 
 func (s *Sender) serve() {
 	if err := s.serveOnce(); err != nil {
-		log.Printf("error: serving rtc to %s: %s", s.remoteIP, err)
+		s.log.Err(err).Msg("failed serving RTC")
 	}
 }
 

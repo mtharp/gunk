@@ -1,11 +1,11 @@
 package web
 
 import (
-	"log"
 	"net/http"
 
 	"eaglesong.dev/gunk/ingest"
 	"github.com/gorilla/mux"
+	"github.com/rs/zerolog/hlog"
 )
 
 func (s *Server) viewPlayWeb(rw http.ResponseWriter, req *http.Request) {
@@ -14,7 +14,7 @@ func (s *Server) viewPlayWeb(rw http.ResponseWriter, req *http.Request) {
 	if err == ingest.ErrNoChannel {
 		http.NotFound(rw, req)
 	} else if err != nil {
-		log.Println("error:", err)
+		hlog.FromRequest(req).Err(err).Str("channel", chname).Msg("failed to serve HLS")
 	}
 }
 
@@ -24,6 +24,6 @@ func (s *Server) viewPlayTS(rw http.ResponseWriter, req *http.Request) {
 	if err == ingest.ErrNoChannel {
 		http.NotFound(rw, req)
 	} else if err != nil {
-		log.Println("error:", err)
+		hlog.FromRequest(req).Err(err).Str("channel", chname).Msg("failed to serve TS")
 	}
 }

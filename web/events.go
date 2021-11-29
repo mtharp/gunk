@@ -1,17 +1,16 @@
 package web
 
 import (
-	"log"
-
 	"eaglesong.dev/gunk/model"
 	"eaglesong.dev/gunk/sinks/grabber"
+	"github.com/rs/zerolog/log"
 )
 
 func (s *Server) PublishEvent(auth model.ChannelAuth, live bool, thumb grabber.Result) {
 	if live && thumb.Time.IsZero() {
 		go func() {
 			if err := s.doWebhook(auth); err != nil {
-				log.Printf("warning: invoking webhook for %s: %s", auth.Name, err)
+				log.Err(err).Str("channel", auth.Name).Msg("failed to invoke webhook")
 			}
 		}()
 	}

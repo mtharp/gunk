@@ -1,13 +1,13 @@
 package ftl
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"strconv"
 	"strings"
@@ -39,10 +39,7 @@ func (c *Conn) handleConnect(words []string) error {
 	} else if c.state != stateUnauth {
 		return errors.New("invalid state for CONNECT")
 	}
-	channelID, digestHex := words[1], words[2]
-	if strings.HasPrefix(digestHex, "$") {
-		digestHex = digestHex[1:]
-	}
+	channelID, digestHex := words[1], strings.TrimPrefix(words[2], "$")
 	digest, err := hex.DecodeString(digestHex)
 	if err != nil {
 		return fmt.Errorf("parsing CONNECT: %s", err)
@@ -169,15 +166,16 @@ func (c *Conn) handleLive() error {
 	_ = adeframer
 	hashKeys := c.hashKeys(ip)
 	c.s.addReceiver(hashKeys, rch)
-	remote := ip.String()
 	go func() {
 		defer c.s.delReceiver(hashKeys, rch)
 		src := &pktque.FilterDemuxer{
 			Demuxer: pktSrc,
 			Filter:  new(CombineSlices),
 		}
-		if err := c.s.Publish(c.auth, "ftl", remote, src); err != nil {
-			log.Printf("[ftl] error: publishing from %s: %s", remote, err)
+		l := c.log.With().Str("kind", "ftl").Logger()
+		ctx := l.WithContext(context.Background())
+		if err := c.s.Publish(ctx, c.auth, src); err != nil {
+			c.log.Err(err).Msg("error in FTL publish")
 			c.cancel()
 		}
 	}()

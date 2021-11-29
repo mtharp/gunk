@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"math/rand"
 	"net"
 	"net/http"
@@ -17,20 +16,30 @@ import (
 	"eaglesong.dev/gunk/web"
 	"github.com/joho/godotenv"
 	"github.com/nareix/joy4/format/rtmp"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 
 	_ "net/http/pprof"
 )
 
 func main() {
-	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	log.Logger = zerolog.New(os.Stderr).With().Timestamp().Logger()
+	if v := os.Getenv("LOG_LEVEL"); v != "" {
+		level, err := zerolog.ParseLevel(v)
+		if err != nil {
+			log.Fatal().Err(err).Msg("invalid LOG_LEVEL")
+		}
+		zerolog.SetGlobalLevel(level)
+	}
 	rand.Seed(time.Now().UnixNano())
 	_ = godotenv.Load(".env")
 	_ = godotenv.Load(".env.local")
 	base := strings.TrimSuffix(os.Getenv("BASE_URL"), "/")
 	u, err := url.Parse(base)
 	if err != nil {
-		log.Fatalf("error: in BASE_URL: %s", err)
+		log.Fatal().Err(err).Msg("invalid BASE_URL")
 	}
 	s := &web.Server{
 		BaseURL: base,
@@ -41,13 +50,13 @@ func main() {
 	}
 	s.SetOauth(os.Getenv("CLIENT_ID"), os.Getenv("CLIENT_SECRET"))
 	if k := os.Getenv("COOKIE_SECRET"); k == "" {
-		log.Fatalln("error: COOKIE_SECRET must be set")
+		log.Fatal().Msg("COOKIE_SECRET must be set")
 	} else {
 		s.SetSecret(k)
 	}
 	if v := os.Getenv("WEBHOOK"); v != "" {
 		if err := s.SetWebhook(v); err != nil {
-			log.Fatalln("error: setting webhook:", err)
+			log.Fatal().Err(err).Msg("failed to set webhook")
 		}
 	}
 	if v := os.Getenv("RTMP_URL"); v != "" {
@@ -58,7 +67,7 @@ func main() {
 	if v := os.Getenv("LIVE_URL"); v != "" {
 		s.AdvertiseLive, err = url.Parse(v)
 		if err != nil {
-			log.Fatalln("LIVE_URL:", err)
+			log.Fatal().Err(err).Msg("invalid LIVE_URL")
 		}
 	} else {
 		s.AdvertiseLive = u
@@ -66,12 +75,12 @@ func main() {
 	if v := os.Getenv("HLS_URL"); v != "" {
 		s.HLSBase, err = url.Parse(v)
 		if err != nil {
-			log.Fatalln("HLS_URL:", err)
+			log.Fatal().Err(err).Msg("invalid HLS_URL")
 		}
 	}
 	if v := os.Getenv("WORK_DIR"); v != "" {
 		if err := os.MkdirAll(v, 0700); err != nil {
-			log.Fatalln("error:", err)
+			log.Fatal().Err(err).Msg("failed to create WORK_DIR")
 		}
 		s.Channels.WorkDir = v
 	}
@@ -80,16 +89,16 @@ func main() {
 	}
 	s.Channels.UseDASH = true
 	if err := model.Connect(); err != nil {
-		log.Fatalln("error: connecting to database:", err)
+		log.Fatal().Err(err).Msg("failed to connect database")
 	}
 	if err := s.Initialize(); err != nil {
-		log.Fatalln("error:", err)
+		log.Fatal().Err(err).Msg("failed to start server")
 	}
 
 	if v := os.Getenv("METRICS"); v != "" {
 		lis, err := net.Listen("tcp", v)
 		if err != nil {
-			log.Fatalln("error:", err)
+			log.Fatal().Err(err).Msg("failed to start metrics")
 		}
 		go http.Serve(lis, nil)
 	}
@@ -104,7 +113,7 @@ func main() {
 	}
 	eg.Go(func() error { return rs.ListenAndServe() })
 	if err := s.Channels.FTL.Listen(os.Getenv("LISTEN_FTL")); err != nil {
-		log.Fatalln("error:", err)
+		log.Fatal().Err(err).Msg("failed to start FTL")
 	}
 	eg.Go(func() error { return s.Channels.FTL.Serve() })
 	eg.Go(func() error {
@@ -120,7 +129,6 @@ func main() {
 			s.Channels.Cleanup()
 		}
 	}()
-	if err := eg.Wait(); err != nil {
-		log.Fatalln("error:", err)
-	}
+	err = eg.Wait()
+	log.Err(err).Msg("server stopped")
 }
