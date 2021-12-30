@@ -11,9 +11,19 @@ import (
 func realIPMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		hlog.FromRequest(r).UpdateContext(func(c zerolog.Context) zerolog.Context {
-			c = c.Str("ip", stripPort(r.RemoteAddr))
+			clientIP := stripPort(r.RemoteAddr)
+			c = c.Str("ip", clientIP)
 			if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-				c = c.Str("xff", xff)
+				proxies := strings.Split(xff, ",")
+				for i, p := range proxies {
+					proxies[i] = strings.TrimSpace(p)
+				}
+				c = c.Strs("xff", proxies)
+				// use the first IP as the "real" one for purposes of counting
+				// distinct HLS viewers
+				r.RemoteAddr = proxies[0]
+			} else {
+				r.RemoteAddr = clientIP
 			}
 			return c
 		})
