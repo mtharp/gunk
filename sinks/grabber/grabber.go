@@ -101,7 +101,7 @@ func Grab(channelName string, dm av.Demuxer) (<-chan Result, error) {
 }
 
 func makeFrame(channelName string, cd h264parser.CodecData, raw []byte) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	height := targetWidth * cd.Height() / cd.Width()
 	var jpeg bytes.Buffer
@@ -110,14 +110,14 @@ func makeFrame(channelName string, cd h264parser.CodecData, raw []byte) error {
 		"-loglevel", "warning",
 		"-f", "h264",
 		"-i", "-",
-		"-frames", "1",
+		"-frames:v", "1",
 		"-s", fmt.Sprintf("%dx%d", targetWidth, height),
-		"-f", "singlejpeg", "-")
+		"-f", "mjpeg", "-")
 	cmd.Stdin = bytes.NewReader(raw)
 	cmd.Stdout = &jpeg
 	cmd.Stderr = &errmsg
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("%s\n%s", err.Error(), errmsg.String())
 	}
-	return model.PutThumb(channelName, jpeg.Bytes())
+	return model.PutThumb(ctx, channelName, jpeg.Bytes())
 }

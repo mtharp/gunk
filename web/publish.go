@@ -16,7 +16,7 @@ func (s *Server) viewPublishTS(rw http.ResponseWriter, req *http.Request) {
 		Path:     chname,
 		RawQuery: req.URL.RawQuery,
 	}
-	auth, err := model.VerifyRTMP(u2)
+	auth, err := model.VerifyRTMP(req.Context(), u2)
 	if err != nil {
 		hlog.FromRequest(req).Err(err).Str("channel", chname).Msg("TS authentication failed")
 		http.Error(rw, "", http.StatusForbidden)

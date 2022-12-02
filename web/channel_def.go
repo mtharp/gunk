@@ -2,11 +2,13 @@ package web
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"eaglesong.dev/gunk/model"
 	"github.com/gorilla/mux"
-	"github.com/jackc/pgx"
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/rs/zerolog/hlog"
 )
 
@@ -20,7 +22,7 @@ func (s *Server) viewDefs(rw http.ResponseWriter, req *http.Request) {
 	if userID == "" {
 		return
 	}
-	defs, err := model.ListChannelDefs(userID)
+	defs, err := model.ListChannelDefs(req.Context(), userID)
 	if err != nil {
 		hlog.FromRequest(req).Err(err).Msg("failed listing channels")
 		http.Error(rw, "", 500)
@@ -66,9 +68,9 @@ func (s *Server) viewDefsCreate(rw http.ResponseWriter, req *http.Request) {
 	if !parseRequest(rw, req, &dr) {
 		return
 	}
-	def, err := model.CreateChannel(userID, dr.Name)
+	def, err := model.CreateChannel(req.Context(), userID, dr.Name)
 	if err != nil {
-		if pge, ok := err.(pgx.PgError); ok && pge.Code == "23505" {
+		if pge := new(pgconn.PgError); errors.As(err, &pge) && pge.Code == pgerrcode.UniqueViolation {
 			http.Error(rw, "channel name already in use", http.StatusConflict)
 			return
 		}
@@ -94,7 +96,7 @@ func (s *Server) viewDefsUpdate(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 	name := mux.Vars(req)["name"]
-	if err := model.UpdateChannel(userID, name, du.Announce); err != nil {
+	if err := model.UpdateChannel(req.Context(), userID, name, du.Announce); err != nil {
 		hlog.FromRequest(req).Err(err).Str("channel", name).Msg("failed to update channel")
 		http.Error(rw, "", 500)
 		return
@@ -108,7 +110,7 @@ func (s *Server) viewDefsDelete(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 	name := mux.Vars(req)["name"]
-	if err := model.DeleteChannel(userID, name); err != nil {
+	if err := model.DeleteChannel(req.Context(), userID, name); err != nil {
 		hlog.FromRequest(req).Err(err).Str("channel", name).Msg("failed to delete channel")
 		return
 	}

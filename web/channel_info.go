@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -8,12 +9,12 @@ import (
 
 	"eaglesong.dev/gunk/model"
 	"github.com/gorilla/mux"
-	"github.com/jackc/pgx"
+	"github.com/jackc/pgx/v5"
 	"github.com/rs/zerolog/hlog"
 )
 
-func (s *Server) listChannels(m channelMarkers) ([]*model.ChannelInfo, error) {
-	infos, err := model.ListChannelInfo()
+func (s *Server) listChannels(ctx context.Context, m channelMarkers) ([]*model.ChannelInfo, error) {
+	infos, err := model.ListChannelInfo(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +49,7 @@ func (s *Server) populateChannel(info *model.ChannelInfo) {
 }
 
 func (s *Server) viewChannelInfo(rw http.ResponseWriter, req *http.Request) {
-	infos, err := s.listChannels(nil)
+	infos, err := s.listChannels(req.Context(), nil)
 	if err != nil {
 		hlog.FromRequest(req).Err(err).Msg("failed listing channels")
 		http.Error(rw, "", 500)
@@ -73,7 +74,7 @@ func (s *Server) viewChannelInfo(rw http.ResponseWriter, req *http.Request) {
 
 func (s *Server) viewThumb(rw http.ResponseWriter, req *http.Request) {
 	chname := mux.Vars(req)["channel"]
-	jpeg, err := model.GetThumb(chname)
+	jpeg, err := model.GetThumb(req.Context(), chname)
 	if err == pgx.ErrNoRows {
 		hlog.FromRequest(req).Info().Str("channel", chname).Msg("channel not found")
 		http.NotFound(rw, req)

@@ -1,22 +1,20 @@
 package model
 
 import (
+	"context"
 	"errors"
+	"time"
 
-	"github.com/jackc/pgx"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var db *pgx.ConnPool
+var db *pgxpool.Pool
 
 func Connect() error {
-	conf, err := pgx.ParseEnvLibpq()
-	if err != nil {
-		return err
-	}
-	db, err = pgx.NewConnPool(pgx.ConnPoolConfig{
-		ConnConfig:     conf,
-		MaxConnections: 10,
-	})
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	var err error
+	db, err = pgxpool.New(ctx, "")
 	return err
 }
 

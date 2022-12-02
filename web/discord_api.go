@@ -70,7 +70,7 @@ func (s *Server) lookupUser(ctx context.Context, token *oauth2.Token) (user disc
 	if err != nil {
 		return
 	}
-	err = model.SetUser(user.ID, newToken, announce)
+	err = model.SetUser(ctx, user.ID, newToken, announce)
 	return
 }
 

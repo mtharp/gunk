@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -108,8 +110,14 @@ func main() {
 		Server: rtmp.Server{
 			Addr: os.Getenv("LISTEN_RTMP"),
 		},
-		CheckUser: model.VerifyRTMP,
-		Publish:   s.Channels.Publish,
+		CheckUser: func(u *url.URL) (model.ChannelAuth, error) {
+			chname := path.Base(u.Path)
+			key := u.Query().Get("key")
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			return model.VerifyPassword(ctx, chname, key)
+		},
+		Publish: s.Channels.Publish,
 	}
 	eg.Go(func() error { return rs.ListenAndServe() })
 	if err := s.Channels.FTL.Listen(os.Getenv("LISTEN_FTL")); err != nil {

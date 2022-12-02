@@ -1,14 +1,15 @@
 package model
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"io"
 	"math/big"
 	"net/url"
 
-	"github.com/jackc/pgx"
-	"github.com/jackc/pgx/pgtype"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type ChannelDef struct {
@@ -27,8 +28,8 @@ func (d *ChannelDef) SetURL(base string) {
 	d.RTMPBase = url.PathEscape(d.Name) + "?" + v.Encode()
 }
 
-func ListChannelDefs(userID string) (defs []*ChannelDef, err error) {
-	rows, err := db.Query("SELECT name, key, announce, ftl_id FROM channel_defs WHERE user_id = $1", userID)
+func ListChannelDefs(ctx context.Context, userID string) (defs []*ChannelDef, err error) {
+	rows, err := db.Query(ctx, "SELECT name, key, announce, ftl_id FROM channel_defs WHERE user_id = $1", userID)
 	if err != nil {
 		return
 	}
@@ -47,14 +48,14 @@ func ListChannelDefs(userID string) (defs []*ChannelDef, err error) {
 	return
 }
 
-func CreateChannel(userID, name string) (def *ChannelDef, err error) {
+func CreateChannel(ctx context.Context, userID, name string) (def *ChannelDef, err error) {
 	b := make([]byte, 24)
 	if _, err = io.ReadFull(rand.Reader, b); err != nil {
 		return
 	}
 	key := hex.EncodeToString(b)
 	ftlID, _ := rand.Int(rand.Reader, new(big.Int).SetInt64(1<<31))
-	_, err = db.Exec("INSERT INTO channel_defs (user_id, name, key, announce, ftl_id) VALUES ($1, $2, $3, true, $4)",
+	_, err = db.Exec(ctx, "INSERT INTO channel_defs (user_id, name, key, announce, ftl_id) VALUES ($1, $2, $3, true, $4)",
 		userID, name, key, ftlID.String())
 	if err != nil {
 		return
@@ -67,8 +68,8 @@ func CreateChannel(userID, name string) (def *ChannelDef, err error) {
 	}, nil
 }
 
-func UpdateChannel(userID, name string, announce bool) error {
-	tag, err := db.Exec("UPDATE channel_defs SET announce = $1 WHERE user_id = $2 AND name = $3", announce, userID, name)
+func UpdateChannel(ctx context.Context, userID, name string, announce bool) error {
+	tag, err := db.Exec(ctx, "UPDATE channel_defs SET announce = $1 WHERE user_id = $2 AND name = $3", announce, userID, name)
 	if err != nil {
 		return err
 	} else if tag.RowsAffected() == 0 {
@@ -77,7 +78,7 @@ func UpdateChannel(userID, name string, announce bool) error {
 	return nil
 }
 
-func DeleteChannel(userID, name string) error {
-	_, err := db.Exec("DELETE FROM channel_defs WHERE user_id = $1 AND name = $2", userID, name)
+func DeleteChannel(ctx context.Context, userID, name string) error {
+	_, err := db.Exec(ctx, "DELETE FROM channel_defs WHERE user_id = $1 AND name = $2", userID, name)
 	return err
 }

@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 type ChannelInfo struct {
 	Name      string `json:"name"`
@@ -14,8 +17,8 @@ type ChannelInfo struct {
 	RTC       bool   `json:"rtc"`
 }
 
-func ListChannelInfo() (ret []*ChannelInfo, err error) {
-	rows, err := db.Query("SELECT name, updated FROM thumbs WHERE updated > now() - '1 month'::interval ORDER BY greatest(now() - updated, '1 minute'::interval) ASC, 1 ASC")
+func ListChannelInfo(ctx context.Context) (ret []*ChannelInfo, err error) {
+	rows, err := db.Query(ctx, "SELECT name, updated FROM thumbs WHERE updated > now() - '1 month'::interval ORDER BY greatest(now() - updated, '1 minute'::interval) ASC, 1 ASC")
 	if err != nil {
 		return nil, err
 	}

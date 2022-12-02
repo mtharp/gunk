@@ -1,17 +1,17 @@
 // import Hls from 'hls.js/dist/hls';
-import dashjs, { MediaPlayer, MediaPlayerSettingClass } from 'dashjs';
-import ws from './ws';
+import dashjs, { MediaPlayer, MediaPlayerSettingClass } from "dashjs";
+import ws from "./ws";
 
 // play video when ready and restore and save volume
-function autoplay (video: HTMLVideoElement) {
+function autoplay(video: HTMLVideoElement) {
   video.onvolumechange = null;
   video.muted = true;
   let forcedMute = false;
   video.onplay = function () {
     // update saved volume once playing, after we're done testing whether we can unmute
     video.onvolumechange = () => {
-      localStorage.setItem('unmute', String(!video.muted));
-      localStorage.setItem('volume', String(Math.round(video.volume * 100)));
+      localStorage.setItem("unmute", String(!video.muted));
+      localStorage.setItem("volume", String(Math.round(video.volume * 100)));
     };
     if (!forcedMute) {
       video.onclick = null;
@@ -32,25 +32,30 @@ function autoplay (video: HTMLVideoElement) {
   video.oncanplay = function () {
     video.oncanplay = null;
     // restore saved volume
-    const vol = Number(localStorage.getItem('volume'));
+    const vol = Number(localStorage.getItem("volume"));
     if (vol) {
       video.volume = vol / 100;
     }
-    if (localStorage.getItem('unmute') !== 'false') {
+    if (localStorage.getItem("unmute") !== "false") {
       video.muted = false;
     }
-    video.play()
-      .catch(() => {
-        // autoplay not allowed with sound, mute and try again
-        video.muted = true;
-        video.onclick = function () {
-          // unmute on click
-          video.muted = false;
-        };
-        forcedMute = true;
-        return video.play();
-      });
+    video.play().catch(() => {
+      // autoplay not allowed with sound, mute and try again
+      video.muted = true;
+      video.onclick = function () {
+        // unmute on click
+        video.muted = false;
+      };
+      forcedMute = true;
+      return video.play();
+    });
   };
+}
+
+export interface PlayerProvider {
+  destroy(): void;
+  seekLive(): void;
+  latencyTo(): number;
 }
 
 // export class HLSPlayer {
@@ -108,26 +113,28 @@ function autoplay (video: HTMLVideoElement) {
 // }
 
 // test for iOS, which only supports RTC and native HLS
-export function nativeRequired () {
-  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !("MSStream" in window);
+export function nativeRequired() {
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) && !("MSStream" in window)
+  );
 }
 
 export class NativePlayer {
   video: HTMLVideoElement;
 
-  constructor (video: HTMLVideoElement, webURL: string) {
+  constructor(video: HTMLVideoElement, webURL: string) {
     autoplay(video);
     this.video = video;
     video.src = webURL;
   }
 
-  destroy () { }
+  destroy() {}
 
-  seekLive () {
+  seekLive() {
     this.video.play();
   }
 
-  latencyTo () {
+  latencyTo() {
     return 0;
   }
 }
@@ -136,30 +143,29 @@ export class DASHPlayer {
   video: HTMLVideoElement;
   stream: dashjs.MediaPlayerClass;
 
-  constructor (video: HTMLVideoElement, webURL: string, lowLatencyMode: boolean) {
+  constructor(
+    video: HTMLVideoElement,
+    webURL: string,
+    lowLatencyMode: boolean
+  ) {
     autoplay(video);
     this.video = video;
     this.stream = MediaPlayer().create();
     this.stream.initialize();
     const settings: MediaPlayerSettingClass = {
       streaming: {
-        lowLatencyEnabled: lowLatencyMode,
-        lowLatencyEnabledByManifest: false,
         liveCatchup: {
-          playbackRate: {
-            min: -0.1,
-            max: 0.1,
-          },
+          playbackRate: 0.1,
         },
         utcSynchronization: {
-          timeBetweenSyncAttempts: 30
-        }
-      }
+          timeBetweenSyncAttempts: 30,
+        },
+      },
     };
     if (lowLatencyMode) {
-      settings.streaming!.delay = {liveDelay: 2};
+      settings.streaming!.delay = { liveDelay: 2 };
     } else {
-      settings.streaming!.delay = {liveDelayFragmentCount: 2};
+      settings.streaming!.delay = { liveDelayFragmentCount: 2 };
     }
     this.stream.updateSettings(settings);
     this.stream.setAutoPlay(true);
@@ -167,16 +173,16 @@ export class DASHPlayer {
     this.stream.attachView(video);
   }
 
-  destroy () {
+  destroy() {
     this.stream.reset();
   }
 
-  seekLive () {
+  seekLive() {
     this.stream.seek(this.stream.duration());
     this.stream.play();
   }
 
-  latencyTo () {
+  latencyTo() {
     return this.stream.getCurrentLiveLatency();
   }
 }
@@ -185,22 +191,24 @@ export class RTCPlayer {
   video: HTMLVideoElement;
   pc: RTCPeerConnection;
 
-  constructor (video: HTMLVideoElement, channel: string) {
+  constructor(video: HTMLVideoElement, channel: string) {
     autoplay(video);
     this.video = video;
     this.pc = new RTCPeerConnection({
-      iceServers: [{
-        urls: [
-          'stun:stun1.l.google.com:19302',
-          'stun:stun2.l.google.com:19302'
-        ]
-      }]
+      iceServers: [
+        {
+          urls: [
+            "stun:stun1.l.google.com:19302",
+            "stun:stun2.l.google.com:19302",
+          ],
+        },
+      ],
     });
     // accept audio and video
     let offerArgs = {};
     try {
-      this.pc.addTransceiver('audio', { direction: 'recvonly' });
-      this.pc.addTransceiver('video', { direction: 'recvonly' });
+      this.pc.addTransceiver("audio", { direction: "recvonly" });
+      this.pc.addTransceiver("video", { direction: "recvonly" });
     } catch {
       // backwards compat
       offerArgs = { offerToReceiveVideo: true, offerToReceiveAudio: true };
@@ -210,19 +218,20 @@ export class RTCPlayer {
     this.pc.ontrack = function (ev) {
       ms.addTrack(ev.track);
 
-      if ('srcObject' in video) {
+      if ("srcObject" in video) {
         video.srcObject = ms;
       } else {
         // @ts-ignore-next-line
         video.src = URL.createObjectURL(ms);
       }
     };
-    this.pc.addEventListener('icecandidate', (ev) => {
+    this.pc.addEventListener("icecandidate", (ev) => {
       if (ev.candidate) {
         ws.candidate(ev.candidate);
       }
     });
-    ws.onCandidate = (cand: RTCIceCandidateInit) => this.pc.addIceCandidate(cand);
+    ws.onCandidate = (cand: RTCIceCandidateInit) =>
+      this.pc.addIceCandidate(cand);
     // request an offer
     ws.play(channel)
       .then((offer: RTCSessionDescriptionInit) => {
@@ -235,16 +244,16 @@ export class RTCPlayer {
       });
   }
 
-  destroy () {
+  destroy() {
     ws.stop();
     this.pc.close();
   }
 
-  seekLive () {
+  seekLive() {
     this.video.play();
   }
 
-  latencyTo () {
+  latencyTo() {
     return 0;
   }
 }

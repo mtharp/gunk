@@ -121,7 +121,7 @@ func (w *wsConn) sendLoop(ctx context.Context) (err error) {
 				return fmt.Errorf("write: %w", err)
 			}
 		case <-t.C:
-			changed, err := w.server.listChannels(markers)
+			changed, err := w.server.listChannels(ctx, markers)
 			if err != nil {
 				log.Ctx(ctx).Err(err).Msg("failed listing channels")
 			}

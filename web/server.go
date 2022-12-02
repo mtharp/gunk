@@ -1,12 +1,14 @@
 package web
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
 	"sync"
+	"time"
 
 	"eaglesong.dev/gunk/ingest"
 	"eaglesong.dev/gunk/model"
@@ -38,7 +40,11 @@ type Server struct {
 
 func (s *Server) Initialize() error {
 	s.Channels.PublishEvent = s.PublishEvent
-	s.Channels.FTL.CheckUser = model.VerifyFTL
+	s.Channels.FTL.CheckUser = func(channelID string, nonce, hmacProvided []byte) (auth model.ChannelAuth, err error) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		return model.VerifyFTL(ctx, channelID, nonce, hmacProvided)
+	}
 	s.Channels.FTL.Publish = s.Channels.Publish
 	if err := s.Channels.Initialize(); err != nil {
 		return err
