@@ -14,9 +14,11 @@ import (
 
 	"eaglesong.dev/gunk/ingest"
 	"eaglesong.dev/gunk/ingest/irtmp"
+	"eaglesong.dev/gunk/ingest/rist"
 	"eaglesong.dev/gunk/model"
 	"eaglesong.dev/gunk/web"
 	"github.com/joho/godotenv"
+	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/format/rtmp"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -120,15 +122,21 @@ func main() {
 		Publish: s.Channels.Publish,
 	}
 	eg.Go(func() error { return rs.ListenAndServe() })
-	if err := s.Channels.FTL.Listen(os.Getenv("LISTEN_FTL")); err != nil {
-		log.Fatal().Err(err).Msg("failed to start FTL")
+	if v := os.Getenv("LISTEN_RIST"); v != "" {
+		ristServer := rist.New(func(ctx context.Context, name string, src av.Demuxer) error {
+			ch, err := model.GetChannel(ctx, name)
+			if err != nil {
+				return err
+			}
+			return s.Channels.Publish(ctx, ch, src)
+		})
+		eg.Go(func() error { return ristServer.ListenAndServe(v) })
 	}
-	eg.Go(func() error { return s.Channels.FTL.Serve() })
 	eg.Go(func() error {
 		srv := &http.Server{
-			Addr:        ":8009",
-			Handler:     s.Handler(),
-			ReadTimeout: 15 * time.Second,
+			Addr:              ":8009",
+			Handler:           s.Handler(),
+			ReadHeaderTimeout: 15 * time.Second,
 		}
 		return srv.ListenAndServe()
 	})

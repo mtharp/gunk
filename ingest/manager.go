@@ -5,7 +5,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"eaglesong.dev/gunk/ingest/ftl"
 	"eaglesong.dev/gunk/model"
 	"eaglesong.dev/gunk/sinks/grabber"
 	"eaglesong.dev/gunk/sinks/playrtc"
@@ -21,7 +20,6 @@ type PublishEvent func(auth model.ChannelAuth, live bool, thumb grabber.Result)
 type Manager struct {
 	OpusBitrate  int
 	PublishEvent PublishEvent
-	FTL          ftl.Server
 	WorkDir      string
 	UseDASH      bool
 	RTCHost      string
@@ -31,7 +29,6 @@ type Manager struct {
 }
 
 func (m *Manager) Initialize() error {
-	m.FTL.Publish = m.Publish
 	var err error
 	m.rtc, err = playrtc.NewEngine(m.RTCHost)
 	return err

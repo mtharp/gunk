@@ -3,7 +3,6 @@ package model
 import (
 	"context"
 	"crypto/hmac"
-	"crypto/sha512"
 	"encoding/json"
 
 	"github.com/jackc/pgx/v5"
@@ -29,6 +28,11 @@ func findChannel(ctx context.Context, column, value string) (auth ChannelAuth, k
 	return
 }
 
+func GetChannel(ctx context.Context, name string) (ChannelAuth, error) {
+	auth, _, err := findChannel(ctx, "name", name)
+	return auth, err
+}
+
 func VerifyPassword(ctx context.Context, channel, password string) (auth ChannelAuth, err error) {
 	var expectKey string
 	auth, expectKey, err = findChannel(ctx, "name", channel)
@@ -40,26 +44,6 @@ func VerifyPassword(ctx context.Context, channel, password string) (auth Channel
 	}
 	if !hmac.Equal([]byte(password), []byte(expectKey)) {
 		log.Printf("error: key mismatch for RTMP channel %s", auth.Name)
-		err = ErrUserNotFound
-		return
-	}
-	return
-}
-
-func VerifyFTL(ctx context.Context, channelID string, nonce, hmacProvided []byte) (auth ChannelAuth, err error) {
-	var expectKey string
-	auth, expectKey, err = findChannel(ctx, "ftl_id", channelID)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			err = ErrUserNotFound
-		}
-		return
-	}
-	hm := hmac.New(sha512.New, []byte(expectKey))
-	hm.Write(nonce)
-	expected := hm.Sum(nil)
-	if !hmac.Equal(expected, hmacProvided) {
-		log.Error().Str("channel", auth.Name).Msg("hmac digest mismatch in FTL auth")
 		err = ErrUserNotFound
 		return
 	}

@@ -1,7 +1,6 @@
 package web
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -14,7 +13,6 @@ import (
 
 type defsResponse struct {
 	Channels []*model.ChannelDef `json:"channels"`
-	FTL      string              `json:"ftl"`
 }
 
 func (s *Server) viewDefs(rw http.ResponseWriter, req *http.Request) {
@@ -30,27 +28,8 @@ func (s *Server) viewDefs(rw http.ResponseWriter, req *http.Request) {
 	for _, def := range defs {
 		def.SetURL(s.AdvertiseRTMP)
 	}
-	ftl, _ := json.MarshalIndent(map[string]interface{}{
-		"name":   req.Host,
-		"common": true,
-		"servers": []map[string]interface{}{
-			{
-				"name": req.Host,
-				"url":  s.AdvertiseLive.Hostname(),
-			},
-		},
-		"recommended": map[string]interface{}{
-			"keyint":            2,
-			"output":            "ftl_output",
-			"max audio bitrate": 160,
-			"max video bitrate": 7000,
-			"profile":           "main",
-			"bframes":           0,
-		},
-	}, "", "  ")
 	res := defsResponse{
 		Channels: defs,
-		FTL:      string(ftl) + ",",
 	}
 	writeJSON(rw, res)
 }
