@@ -9,12 +9,19 @@
           <img src="/favicon96.png" alt="a dapper fellow" />
           {{ siteName }}
         </router-link>
-        <ul class="navbar-nav mr-auto">
+        <ul class="navbar-nav mr-auto flex-grow-1">
           <li class="nav-item">
-            <router-link class="nav-link" to="/">Home</router-link>
+            <router-link class="nav-link" to="/" title="Home"
+              ><b-icon-house-fill
+            /></router-link>
           </li>
           <li class="nav-item" v-if="loggedIn">
-            <router-link class="nav-link" to="/mychannels">Create</router-link>
+            <router-link
+              class="nav-link"
+              to="/mychannels"
+              title="Create a channel"
+              ><b-icon-pencil-fill
+            /></router-link>
           </li>
         </ul>
         <ul class="navbar-nav ml-auto">
@@ -53,6 +60,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
 import { RouterView, RouterLink } from "vue-router";
+import { BIconHouseFill, BIconPencilFill } from "bootstrap-icons-vue";
 // import router from "./router";
 import { useChannelsStore } from "./stores/channels";
 import { useControlsHider } from "./stores/controls-hider";

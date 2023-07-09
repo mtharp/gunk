@@ -126,9 +126,9 @@
           >
             <b-icon-gear-fill />
           </button>
-          <ul class="dropdown-menu dropdown-menu-end">
+          <form class="dropdown-menu dropdown-menu-end">
             <!-- for some reason chrome won't open a .m3u8 file directly so don't show the playlist link -->
-            <li v-if="!isWebKit">
+            <div v-if="!isWebKit">
               <a
                 class="dropdown-item"
                 :href="playlistURL"
@@ -137,8 +137,8 @@
                 <img src="/vlc.png" />
                 Watch in VLC
               </a>
-            </li>
-            <li>
+            </div>
+            <div>
               <a
                 class="dropdown-item"
                 :href="ch.live_url"
@@ -146,22 +146,35 @@
               >
                 <b-icon-clipboard-data />Copy VLC URL
               </a>
-            </li>
-            <!-- <b-dropdown-form v-if="state.showCopyVLC">
-              <b-form-input ref="copyVLCInput" :value="ch.live_url" readonly />
-            </b-dropdown-form>
-
-            <b-dropdown-form>
-              <b-form-checkbox v-model="preferences.useRTC" :disabled="!ch.rtc"
-                >Use WebRTC</b-form-checkbox
-              >
-            </b-dropdown-form>
-            <b-dropdown-form>
-              <b-form-checkbox v-model="preferences.lowLatency"
-                >Low Latency</b-form-checkbox
-              >
-            </b-dropdown-form> -->
-          </ul>
+              <input
+                v-if="state.showCopyVLC"
+                ref="copyVLCInput"
+                :value="ch.live_url"
+                readonly
+              />
+            </div>
+            <div class="dropdown-divider"></div>
+            <div class="ps-3">
+              <div class="form-check">
+                <input
+                  type="checkbox"
+                  class="form-check-input"
+                  id="rtc"
+                  v-model="preferences.useRTC"
+                />
+                <label class="form-check-label" for="rtc">Use WebRTC</label>
+              </div>
+              <div class="form-check">
+                <input
+                  type="checkbox"
+                  class="form-check-input"
+                  id="ll"
+                  v-model="preferences.lowLatency"
+                />
+                <label class="form-check-label" for="ll">Low Latency</label>
+              </div>
+            </div>
+          </form>
         </div>
         <!-- fullscreen -->
         <button
@@ -198,7 +211,7 @@ import {
   choosePlayer,
 } from "../players/provider";
 import { useControlsHider } from "@/stores/controls-hider";
-// import { usePreferences } from "@/stores/preferences";
+import { usePreferences } from "@/stores/preferences";
 import {
   BIconPlayFill,
   BIconPauseFill,
@@ -221,7 +234,7 @@ const container = ref<HTMLElement | null>(null);
 const video = ref<HTMLVideoElement | null>(null);
 const copyVLCInput = ref<HTMLInputElement | null>(null);
 const controlsHider = useControlsHider();
-// const preferences = usePreferences();
+const preferences = usePreferences();
 
 const hasFullscreen = document.fullscreenEnabled;
 const isWebKit = navigator.userAgent.indexOf("WebKit") >= 0;
