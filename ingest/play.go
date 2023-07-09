@@ -10,6 +10,7 @@ import (
 
 	"eaglesong.dev/gunk/model"
 	"eaglesong.dev/gunk/sinks/playrtc"
+	"eaglesong.dev/hls"
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/format/ts"
 	"github.com/rs/zerolog"
@@ -77,12 +78,19 @@ func (m *Manager) PopulateLive(infos []*model.ChannelInfo) {
 		if ch == nil {
 			continue
 		}
-		info.Live = ch.isLive()
+		switch ch.isLive() {
+		case statePending:
+			info.Pending = true
+		case stateLive:
+			info.Live = true
+		}
 		info.Viewers = ch.currentViewers()
-		if m.UseDASH {
-			info.WebURL = ch.getWeb().MPD()
-		} else {
+		if m.PublishMode == hls.ModeSingleTrack {
+			// HLS only
 			info.WebURL = ch.getWeb().Playlist()
+		} else {
+			// Prefer DASH
+			info.WebURL = ch.getWeb().MPD()
 		}
 		info.NativeURL = ch.getWeb().Playlist()
 		info.RTC = atomic.LoadUintptr(&ch.rtc) != 0

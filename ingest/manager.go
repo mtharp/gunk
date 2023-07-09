@@ -20,8 +20,8 @@ type PublishEvent func(auth model.ChannelAuth, live bool, thumb grabber.Result)
 type Manager struct {
 	OpusBitrate  int
 	PublishEvent PublishEvent
+	PublishMode  hls.Mode
 	WorkDir      string
-	UseDASH      bool
 	RTCHost      string
 
 	channels sync.Map
@@ -40,6 +40,7 @@ type channel struct {
 	aac, opus *pubsub.Queue
 	web       *hls.Publisher
 	stoppedAt time.Time
+	name      string
 
 	live, rtc uintptr
 	viewers   int32 // excluding web
@@ -73,11 +74,19 @@ func (ch *channel) queue(opus bool) av.Demuxer {
 	return q.Latest()
 }
 
-func (ch *channel) isLive() bool {
+type liveState uintptr
+
+const (
+	stateOffline liveState = iota
+	statePending
+	stateLive
+)
+
+func (ch *channel) isLive() liveState {
 	if ch == nil {
-		return false
+		return stateOffline
 	}
-	return atomic.LoadUintptr(&ch.live) != 0
+	return liveState(atomic.LoadUintptr(&ch.live))
 }
 
 func (ch *channel) addViewer(delta int32) {

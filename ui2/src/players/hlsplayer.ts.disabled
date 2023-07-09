@@ -1,0 +1,54 @@
+import Hls, { type HlsConfig } from "hls.js";
+import autoplay from "./autoplay";
+
+export default class HLSPlayer {
+  video: HTMLVideoElement;
+  stream: Hls;
+
+  constructor(
+    video: HTMLVideoElement,
+    webURL: string,
+    lowLatencyMode: boolean
+  ) {
+    autoplay(video);
+    this.video = video;
+
+    const conf: Partial<HlsConfig> = {
+      debug: true,
+      liveDurationInfinity: true,
+      backBufferLength: 10,
+      lowLatencyMode: lowLatencyMode,
+      maxLiveSyncPlaybackRate: 1,
+    };
+    if (lowLatencyMode) {
+      conf.backBufferLength = 0;
+      conf.liveSyncDuration = 2;
+      conf.maxLiveSyncPlaybackRate = 1.1;
+    } else {
+      conf.liveSyncDurationCount = 2;
+    }
+    this.stream = new Hls(conf);
+    this.stream.attachMedia(video);
+    this.stream.loadSource(webURL);
+    this.stream.on(Hls.Events.MANIFEST_LOADED, () => {
+      if (video.oncanplay) {
+        video.oncanplay(new Event(""));
+      }
+    });
+  }
+
+  destroy() {
+    this.stream.destroy();
+  }
+
+  seekLive() {
+    if (this.stream.liveSyncPosition) {
+      this.video.currentTime = this.stream.liveSyncPosition;
+      this.video.play();
+    }
+  }
+
+  latencyTo() {
+    return this.stream.latency;
+  }
+}

@@ -8,6 +8,7 @@ import (
 type ChannelInfo struct {
 	Name      string `json:"name"`
 	Live      bool   `json:"live"`
+	Pending   bool   `json:"pending"`
 	Last      int64  `json:"last"`
 	Thumb     string `json:"thumb"`
 	LiveURL   string `json:"live_url"`
@@ -42,6 +43,7 @@ func (i *ChannelInfo) Equal(j *ChannelInfo) bool {
 	}
 	return i.Name == j.Name &&
 		i.Live == j.Live &&
+		i.Pending == j.Pending &&
 		i.Last == j.Last &&
 		i.Viewers == j.Viewers &&
 		i.RTC == j.RTC

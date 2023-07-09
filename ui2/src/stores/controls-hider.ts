@@ -6,7 +6,7 @@ interface ControlsState {
   mouseMoving: number;
   mouseTimer?: number;
   tabTimer?: number;
-  targetPlayer?: any;
+  targetPlayer?: HTMLVideoElement;
 }
 
 export const useControlsHider = defineStore("controls-hider", {
@@ -14,6 +14,9 @@ export const useControlsHider = defineStore("controls-hider", {
     configured: false,
     isTabbing: false,
     mouseMoving: 0,
+    mouseTimer: undefined,
+    tabTimer: undefined,
+    targetPlayer: undefined,
   }),
   actions: {
     // called by a player when it mounts, remember its unique key
@@ -23,6 +26,7 @@ export const useControlsHider = defineStore("controls-hider", {
         document.addEventListener("mousemove", this.mouseMove);
         document.addEventListener("mouseout", this.mouseOut);
         document.addEventListener("keyup", this.keyUp);
+        this.configured = true;
       }
     },
     // when a player unmounts, stop hiding controls unless a different player
@@ -37,7 +41,7 @@ export const useControlsHider = defineStore("controls-hider", {
         return;
       }
       this.mouseMoving = performance.now() + 3000;
-      if (this.mouseTimer) {
+      if (!this.mouseTimer) {
         this.mouseTimer = window.setInterval(this.mouseCheck, 500);
       }
     },
@@ -47,7 +51,7 @@ export const useControlsHider = defineStore("controls-hider", {
         return;
       }
       this.mouseMoving = ev.timeStamp + 1000;
-      if (this.mouseTimer) {
+      if (!this.mouseTimer) {
         this.mouseTimer = window.setInterval(this.mouseCheck, 500);
       }
     },
@@ -104,24 +108,3 @@ export const useControlsHider = defineStore("controls-hider", {
     },
   },
 });
-
-// <style>
-// .hidden-control {
-//   position: absolute !important;
-//   opacity: 0;
-//   transition: opacity 0.5s;
-//   pointer-events: none;
-// }
-// .show-control,
-// .hidden-control:hover {
-//   opacity: 1 !important;
-//   pointer-events: auto !important;
-// }
-// .no-outline {
-//   outline: none;
-// }
-// .is-tabbing *:focus {
-//   outline: 2px solid #7aacfe !important;
-//   outline: 5px auto -webkit-focus-ring-color !important;
-// }
-// </style>

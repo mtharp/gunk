@@ -52,7 +52,7 @@
             <b-icon-volume-mute-fill />
           </button>
           <div :class="volumeClasses">
-            <!-- <vue-slider
+            <vue-slider
               v-model="state.volume"
               drag-on-click
               tooltip="none"
@@ -65,7 +65,7 @@
                 video!.volume = state.volume;
                 video!.muted = false;
               "
-            /> -->
+            />
           </div>
         </div>
       </div>
@@ -179,8 +179,8 @@
 </template>
 
 <script setup lang="ts">
-// import VueSlider from "vue-slider-component";
-// import "vue-slider-component/theme/material.css";
+import VueSlider from "vue-slider-component";
+import "vue-slider-component/theme/antd.css";
 
 import {
   computed,
@@ -191,9 +191,12 @@ import {
   reactive,
   ref,
 } from "vue";
-import { DASHPlayer, RTCPlayer, NativePlayer, nativeRequired } from "../player";
-import type { ChannelInfo } from "@/stores/channels";
-import type { PlayerProvider } from "../player";
+
+import {
+  type PlayerProperties,
+  type PlayerProvider,
+  choosePlayer,
+} from "../players/provider";
 import { useControlsHider } from "@/stores/controls-hider";
 // import { usePreferences } from "@/stores/preferences";
 import {
@@ -213,11 +216,7 @@ import {
   BIconFullscreenExit,
 } from "bootstrap-icons-vue";
 
-const props = defineProps<{
-  ch: ChannelInfo;
-  rtcActive: boolean;
-  lowLatency: boolean;
-}>();
+const props = defineProps<PlayerProperties>();
 const container = ref<HTMLElement | null>(null);
 const video = ref<HTMLVideoElement | null>(null);
 const copyVLCInput = ref<HTMLInputElement | null>(null);
@@ -255,22 +254,11 @@ onBeforeMount(() => {
 });
 onMounted(() => {
   const v = video.value as HTMLVideoElement;
-  controlsHider.attachPlayer(video.value);
+  controlsHider.attachPlayer(v);
+  player = choosePlayer(v, props);
   document.addEventListener("fullscreenchange", onFullscreenChanged);
   document.addEventListener("keydown", onKey);
-  if (props.rtcActive) {
-    player = new RTCPlayer(v, props.ch.name);
-    state.atTail = true;
-  } else if (nativeRequired()) {
-    player = new NativePlayer(v, props.ch.native_url);
-  } else {
-    // if (props.ch.web_url.endsWith(".mpd")) {
-    player = new DASHPlayer(v, props.ch.web_url, props.lowLatency);
-    // } else {
-    //   this.player = new HLSPlayer(video, props.ch.web_url, this.lowLatency);
-    // }
-    latencyTimer = window.setInterval(updateLatency, 1000);
-  }
+  latencyTimer = window.setInterval(updateLatency, 1000);
 });
 onUnmounted(() => {
   document.removeEventListener("keydown", onKey);
@@ -536,5 +524,25 @@ function onKey(ev: KeyboardEvent) {
 .volume {
   margin-left: 0.5rem;
   width: 100px;
+}
+
+/* controls hider */
+.hidden-control {
+  position: absolute !important;
+  opacity: 0;
+  transition: opacity 0.5s;
+  pointer-events: none;
+}
+.show-control,
+.hidden-control:hover {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+.no-outline {
+  outline: none;
+}
+.is-tabbing *:focus {
+  outline: 2px solid #7aacfe !important;
+  outline: 5px auto -webkit-focus-ring-color !important;
 }
 </style>

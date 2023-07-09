@@ -17,12 +17,18 @@
       :src="chInfo.thumb"
       class="player-thumb"
     />
-    <div v-if="!chInfo.live" class="player-shade">OFFLINE</div>
+    <div v-if="!chInfo.live" class="player-shade">
+      {{ chInfo.pending ? "GOING LIVE" : "OFFLINE" }}
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { useChannelsStore, type ChannelInfo } from "@/stores/channels";
+import {
+  useChannelsStore,
+  nullChannelInfo,
+  type ChannelInfo,
+} from "@/stores/channels";
 import { usePreferences } from "@/stores/preferences";
 import { computed } from "vue";
 import PlayerBox from "@/components/PlayerBox.vue";
@@ -38,17 +44,7 @@ const chInfo = computed((): ChannelInfo => {
   if (ch) {
     return ch;
   }
-  return {
-    last: 0,
-    live: false,
-    live_url: "",
-    name: "",
-    native_url: "",
-    rtc: false,
-    thumb: "",
-    viewers: 0,
-    web_url: "",
-  };
+  return nullChannelInfo();
 });
 const rtcActive = computed(() => preferences.useRTC && chInfo.value.rtc);
 </script>

@@ -15,6 +15,7 @@ import (
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/av/pubsub"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -63,7 +64,8 @@ func (m *Manager) Publish(ctx context.Context, auth model.ChannelAuth, src av.De
 	// go live
 	v, _ := m.channels.LoadOrStore(name, new(channel))
 	ch := v.(*channel)
-	p := ch.setStream(q, aacq, opusq, m.WorkDir)
+	ch.name = name
+	p := ch.setStream(q, aacq, opusq, m.WorkDir, m.PublishMode)
 	defer func() {
 		l.Info().Msg("stopped publishing")
 		ch.stopStream(q)
@@ -111,7 +113,7 @@ func (m *Manager) Cleanup() {
 	})
 }
 
-func (ch *channel) setStream(q, aacq, opusq *pubsub.Queue, workDir string) *hls.Publisher {
+func (ch *channel) setStream(q, aacq, opusq *pubsub.Queue, workDir string, mode hls.Mode) *hls.Publisher {
 	ch.mu.Lock()
 	defer ch.mu.Unlock()
 	if ch.ingest != nil {
@@ -125,10 +127,10 @@ func (ch *channel) setStream(q, aacq, opusq *pubsub.Queue, workDir string) *hls.
 	}
 	ch.web = &hls.Publisher{
 		WorkDir: workDir,
-		Mode:    hls.ModeSingleAndSeparate,
+		Mode:    mode,
 	}
 	ch.stoppedAt = time.Time{}
-	atomic.StoreUintptr(&ch.live, 1)
+	atomic.StoreUintptr(&ch.live, uintptr(statePending))
 	return ch.web
 }
 
@@ -138,7 +140,7 @@ func (ch *channel) stopStream(q *pubsub.Queue) {
 	if ch.ingest != q {
 		return
 	}
-	atomic.StoreUintptr(&ch.live, 0)
+	atomic.StoreUintptr(&ch.live, uintptr(stateOffline))
 	ch.ingest = nil
 	ch.aac = nil
 	ch.opus = nil
@@ -172,6 +174,8 @@ func (ch *channel) copyWeb(dest av.Muxer, src av.Demuxer) error {
 	if err = dest.WriteHeader(streams); err != nil {
 		return err
 	}
+	needKeys := 3
+	log.Info().Str("channel", ch.name).Msgf("live in %d", needKeys)
 	for {
 		pkt, err := src.ReadPacket()
 		if err == io.EOF {
@@ -181,6 +185,16 @@ func (ch *channel) copyWeb(dest av.Muxer, src av.Demuxer) error {
 		}
 		if err := dest.WritePacket(pkt); err != nil {
 			return err
+		}
+		if pkt.IsKeyFrame && needKeys > 0 {
+			needKeys--
+			ev := log.Info().Str("channel", ch.name)
+			if needKeys == 0 {
+				ev.Msgf("going live")
+				atomic.StoreUintptr(&ch.live, uintptr(stateLive))
+			} else {
+				ev.Msgf("live in %d", needKeys)
+			}
 		}
 	}
 }
