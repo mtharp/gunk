@@ -39,5 +39,9 @@
     "vite-compression-plugin": "^0.0.4",
     "vite-plugin-html": "^3.2.0",
     "vue-tsc": "^0.40.7"
+  },
+  "packageManager": "yarn@3.6.1",
+  "resolutions": {
+    "vue-slider-component@next": "patch:vue-slider-component@npm%3A4.1.0-beta.7#./.yarn/patches/vue-slider-component-npm-4.1.0-beta.7-4054dd8a77.patch"
   }
 }

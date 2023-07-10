@@ -1,0 +1,81 @@
+diff --git a/lib/utils/control.ts b/lib/utils/control.ts
+index 1e09290..60cf252 100644
+--- a/lib/utils/control.ts
++++ b/lib/utils/control.ts
+@@ -1,5 +1,5 @@
+ import Decimal from './decimal'
+-import {
++import type {
+   Value,
+   Mark,
+   MarkOption,
+diff --git a/lib/utils/index.ts b/lib/utils/index.ts
+index f60d0c5..5d0c5fe 100644
+--- a/lib/utils/index.ts
++++ b/lib/utils/index.ts
+@@ -1,4 +1,4 @@
+-import { Direction } from '../typings'
++import type { Direction } from '../typings'
+ 
+ interface IPosObject {
+   x: number
+diff --git a/lib/vue-slider-dot.vue b/lib/vue-slider-dot.vue
+index bf97c05..c35aed1 100644
+--- a/lib/vue-slider-dot.vue
++++ b/lib/vue-slider-dot.vue
+@@ -20,8 +20,8 @@
+ </template>
+ 
+ <script lang="ts">
+-import { defineComponent, PropType } from 'vue'
+-import { Value, Styles, Position, TooltipProp, TooltipFormatter } from './typings'
++import { defineComponent, type PropType } from 'vue'
++import type { Value, Styles, Position, TooltipProp, TooltipFormatter } from './typings'
+ 
+ import './styles/dot.scss';
+ 
+diff --git a/lib/vue-slider-mark.vue b/lib/vue-slider-mark.vue
+index 008485a..47303a6 100644
+--- a/lib/vue-slider-mark.vue
++++ b/lib/vue-slider-mark.vue
+@@ -32,8 +32,8 @@
+ </template>
+ 
+ <script lang="ts">
+-import { defineComponent, PropType } from 'vue'
+-import { Mark, Styles } from './typings'
++import { defineComponent, type PropType } from 'vue'
++import type { Mark, Styles } from './typings'
+ 
+ import './styles/mark.scss';
+ 
+diff --git a/lib/vue-slider.vue b/lib/vue-slider.vue
+index 6a6089c..c90bc9d 100644
+--- a/lib/vue-slider.vue
++++ b/lib/vue-slider.vue
+@@ -102,10 +102,10 @@
+ </template>
+ 
+ <script lang="ts">
+-import { defineComponent, PropType } from 'vue'
++import { defineComponent, type PropType } from 'vue'
+ import VueSliderDot from './vue-slider-dot.vue'
+ import VueSliderMark from './vue-slider-mark.vue'
+-import {
++import type {
+   Value,
+   DataObject,
+   MarksProp,
+@@ -119,10 +119,10 @@ import {
+   TooltipProp,
+   TooltipFormatter,
+ } from './typings'
+-import { getSize, getPos, getKeyboardHandleFunc, HandleFunction } from './utils'
++import { getSize, getPos, getKeyboardHandleFunc, type HandleFunction } from './utils'
+ import Decimal from './utils/decimal'
+ import Control, { ERROR_TYPE } from './utils/control'
+-import State, { StateMap } from './utils/state'
++import State, { type StateMap } from './utils/state'
+ 
+ import './styles/slider.scss'
+ 
