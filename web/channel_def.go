@@ -26,7 +26,7 @@ func (s *Server) viewDefs(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "", 500)
 	}
 	for _, def := range defs {
-		def.SetURL(s.AdvertiseRTMP)
+		def.SetURL(s.AdvertiseRTMP, s.AdvertiseRIST)
 	}
 	res := defsResponse{
 		Channels: defs,
@@ -57,7 +57,7 @@ func (s *Server) viewDefsCreate(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "", 500)
 		return
 	}
-	def.SetURL(s.AdvertiseRTMP)
+	def.SetURL(s.AdvertiseRTMP, s.AdvertiseRIST)
 	writeJSON(rw, def)
 }
 

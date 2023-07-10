@@ -17,12 +17,22 @@ type ChannelDef struct {
 
 	RTMPDir  string `json:"rtmp_dir"`
 	RTMPBase string `json:"rtmp_base"`
+
+	RISTUrl string `json:"rist_url"`
 }
 
-func (d *ChannelDef) SetURL(base string) {
+func (d *ChannelDef) SetURL(base string, rist *url.URL) {
 	v := url.Values{"key": []string{d.Key}}
 	d.RTMPDir = base
 	d.RTMPBase = url.PathEscape(d.Name) + "?" + v.Encode()
+	if rist != nil {
+		u2 := new(url.URL)
+		*u2 = *rist
+		q := rist.Query()
+		q.Set("cname", d.Name)
+		u2.RawQuery = q.Encode()
+		d.RISTUrl = u2.String()
+	}
 }
 
 func ListChannelDefs(ctx context.Context, userID string) (defs []*ChannelDef, err error) {

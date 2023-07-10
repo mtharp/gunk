@@ -45,13 +45,17 @@ func main() {
 	}
 
 	base := strings.TrimSuffix(viper.GetString("base_url"), "/")
-	u, err := url.Parse(base)
+	webBase, err := url.Parse(base)
 	if err != nil {
 		log.Fatal().Err(err).Msg("invalid BASE_URL")
 	}
+	liveHost := viper.GetString("live_hostname")
+	if liveHost == "" {
+		liveHost = webBase.Hostname()
+	}
 	s := &web.Server{
 		BaseURL: base,
-		Secure:  u.Scheme == "https",
+		Secure:  webBase.Scheme == "https",
 		Channels: ingest.Manager{
 			OpusBitrate: viper.GetInt("opus_bitrate"),
 			RTCHost:     viper.GetString("rtc_host"),
@@ -71,7 +75,7 @@ func main() {
 	if v := viper.GetString("rtmp_url"); v != "" {
 		s.AdvertiseRTMP = strings.TrimSuffix(v, "/") + "/live"
 	} else {
-		s.AdvertiseRTMP = "rtmp://" + u.Hostname() + "/live"
+		s.AdvertiseRTMP = "rtmp://" + liveHost + "/live"
 	}
 	if v := viper.GetString("live_url"); v != "" {
 		s.AdvertiseLive, err = url.Parse(v)
@@ -79,7 +83,7 @@ func main() {
 			log.Fatal().Err(err).Msg("invalid LIVE_URL")
 		}
 	} else {
-		s.AdvertiseLive = u
+		s.AdvertiseLive = webBase
 	}
 	if v := viper.GetString("hls_url"); v != "" {
 		s.HLSBase, err = url.Parse(v)
@@ -142,6 +146,23 @@ func main() {
 			return s.Channels.Publish(ctx, ch, src)
 		})
 		eg.Go(func() error { return ristServer.ListenAndServe(v) })
+		if w := viper.GetString("advertise_rist"); w != "" {
+			s.AdvertiseRIST, err = url.Parse(w)
+			if err != nil {
+				log.Fatal().Err(err).Msg("invalid ADVERTISE_RIST")
+			}
+		} else {
+			_, port, err := net.SplitHostPort(v)
+			if err != nil {
+				log.Fatal().Err(err).Msg("unable to parse port from LISTEN_RIST")
+			}
+			hostport := net.JoinHostPort(liveHost, port)
+			s.AdvertiseRIST = &url.URL{
+				Scheme:   "rist",
+				Host:     hostport,
+				RawQuery: "mux-mode=1",
+			}
+		}
 	}
 	eg.Go(func() error {
 		srv := &http.Server{

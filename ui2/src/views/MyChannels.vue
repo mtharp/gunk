@@ -4,12 +4,12 @@
       <h1>My Channels</h1>
       <b-form @submit.prevent="doCreate">
         <b-form-group label="Channel Name">
-          <b-form-input v-model="state.newName" required />
+          <b-form-input v-model="state.newName" required class="mt-1" />
         </b-form-group>
         <b-alert :show="state.alert != ''" variant="danger">{{
           state.alert
         }}</b-alert>
-        <b-button type="submit" variant="primary">Create</b-button>
+        <b-button type="submit" variant="primary" class="mt-3">Create</b-button>
       </b-form>
       <b-list-group class="mt-5">
         <b-list-group-item v-for="def in state.defs" :key="def.name">
@@ -24,18 +24,30 @@
             >
           </b-form-group>
           <b-button
-            class="mr-2"
+            class="my-2"
             size="sm"
             variant="danger"
-            @click="doDelete(def)"
+            @click="doShowDelete(def)"
             >Delete</b-button
           >
-          <b-button class="mr-2" size="sm" @click="doShow(def)"
+          <b-button class="m-2" size="sm" @click="doShow(def)"
             >Show Key</b-button
           >
         </b-list-group-item>
       </b-list-group>
     </div>
+    <!-- deletion modal -->
+    <b-modal
+      title="Delete Channel"
+      id="confirmDelete"
+      v-model="state.showDelete"
+      ok-variant="danger"
+      ok-title="Delete"
+      @ok="doFinishDelete"
+    >
+      Delete channel {{ state.selected.name }}?
+    </b-modal>
+    <!-- stream key modal -->
     <b-modal
       title="Stream Key"
       id="keymodal"
@@ -55,39 +67,36 @@
                 </b-form-group>
                 <b-form-group label="Stream Key">
                   <b-form-input
-                    v-if="state.revealKey"
+                    v-show="state.revealKey"
                     readonly
                     :value="state.selected.rtmp_base"
                   />
-                  <b-button v-else @click="state.revealKey = true"
+                  <b-button
+                    v-show="!state.revealKey"
+                    @click="state.revealKey = true"
                     >Reveal Key</b-button
                   >
                 </b-form-group>
               </b-form>
             </b-card-text>
           </b-tab>
-          <b-tab title="FTL (alpha)">
+          <b-tab title="RIST (alpha)">
             <b-card-text>
               <b-form v-if="state.selected">
+                <b-form-group label="Server (custom service)">
+                  <b-form-input readonly :value="state.selected.rist_url" />
+                </b-form-group>
                 <b-form-group label="Stream Key">
                   <b-form-input
-                    v-if="state.revealKey"
+                    v-show="state.revealKey"
                     readonly
-                    :value="state.selected.ftl_key"
+                    :value="state.selected.key"
                   />
-                  <b-button v-else @click="state.revealKey = true"
+                  <b-button
+                    v-show="!state.revealKey"
+                    @click="state.revealKey = true"
                     >Reveal Key</b-button
                   >
-                </b-form-group>
-                <b-form-group
-                  label="OBS Services Config Snippet"
-                  description='Open C:\Users\YOURACCOUNT\AppData\Roaming\obs-studio\plugin_config\rtmp-services\services.json in Notepad and paste this block after the line: "services": [ and then restart OBS and pick the new entry from the services drop-down. This will probably break every time you update OBS.'
-                >
-                  <b-form-textarea
-                    readonly
-                    rows="18"
-                    :value="state.ftlConfig"
-                  />
                 </b-form-group>
               </b-form>
             </b-card-text>
@@ -138,14 +147,13 @@ interface ChannelDef {
   name: string;
   key?: string;
   announce?: boolean;
-  ftl_key?: string;
+  rist_url?: string;
   rtmp_dir?: string;
   rtmp_base?: string;
 }
 
 interface ChannelsResponse {
   channels: ChannelDef[];
-  ftl: string;
 }
 
 const state = reactive({
@@ -153,15 +161,14 @@ const state = reactive({
   selected: { name: "" } as ChannelDef,
   showKey: false,
   revealKey: false,
+  showDelete: false,
   newName: "",
-  ftlConfig: "",
   alert: "",
 });
 
 onMounted(async () => {
   const { data } = await axios.get<ChannelsResponse>("/api/mychannels");
   state.defs = data.channels;
-  state.ftlConfig = data.ftl;
 });
 
 async function doCreate() {
@@ -189,18 +196,17 @@ function doUpdate(def: ChannelDef) {
   axios.put("/api/mychannels/" + encodeURIComponent(def.name), def);
 }
 
-async function doDelete(def: ChannelDef) {
-  // const confirmed = await state.$bvModal.msgBoxConfirm(
-  //   "Delete channel " + def.name + "?", {
-  //     title: "Delete Channel",
-  //     okVariant: "danger",
-  //     okTitle: "Delete"
-  //   });
-  const confirmed = false;
-  if (confirmed) {
-    await axios.delete("/api/mychannels/" + encodeURIComponent(def.name));
-    state.defs.splice(state.defs.indexOf(def), 1);
-  }
+function doShowDelete(def: ChannelDef) {
+  state.selected = def;
+  state.showDelete = true;
+}
+
+async function doFinishDelete() {
+  await axios.delete(
+    "/api/mychannels/" + encodeURIComponent(state.selected.name)
+  );
+  state.newName = state.selected.name;
+  state.defs.splice(state.defs.indexOf(state.selected), 1);
 }
 
 function doShow(def: ChannelDef) {

@@ -21,6 +21,7 @@ type Server struct {
 	HLSBase       *url.URL // base URL for web playback
 	AdvertiseRTMP string   // base URL to advertise for RTMP ingest
 	AdvertiseLive *url.URL // base URL to advertise for direct HTTP streams
+	AdvertiseRIST *url.URL
 
 	key    [32]byte
 	router *mux.Router

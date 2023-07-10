@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"eaglesong.dev/gunk/ui/src"
+	"eaglesong.dev/gunk/ui2/src/router"
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog/log"
 )
@@ -33,7 +33,7 @@ func uiRoutes(r *mux.Router) {
 		req.URL.Path = "/"
 		handler.ServeHTTP(rw, req)
 	})
-	for _, indexRoute := range src.IndexRoutes() {
+	for _, indexRoute := range router.IndexRoutes() {
 		r.Handle(indexRoute, indexHandler)
 	}
 	r.NotFoundHandler = cacheImmutable(handler)

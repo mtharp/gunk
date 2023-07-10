@@ -24,9 +24,9 @@ export function choosePlayer(
     return new RTCPlayer(video, props.ch.name);
   } else if (nativeRequired()) {
     return new NativePlayer(video, props.ch.native_url);
-  } else /*if (props.ch.web_url.endsWith(".mpd"))*/ {
+  } /*if (props.ch.web_url.endsWith(".mpd"))*/ else {
     return new DASHPlayer(video, props.ch.web_url, props.lowLatency);
-  }/* else {
+  } /* else {
     return new HLSPlayer(video, props.ch.web_url, props.lowLatency);
   }*/
 }

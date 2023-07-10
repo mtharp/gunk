@@ -4,8 +4,8 @@ import { createPinia } from "pinia";
 import App from "./App.vue";
 import router from "./router";
 
-import "./scss/styles.scss";
-import "~bootstrap";
+import "bootstrap/dist/css/bootstrap.css";
+import "bootstrap-vue-next/dist/bootstrap-vue-next.css";
 
 const app = createApp(App);
 

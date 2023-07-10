@@ -4,6 +4,8 @@ import { defineConfig, loadEnv } from "vite";
 import Compression from "vite-compression-plugin";
 import { createHtmlPlugin } from "vite-plugin-html";
 import vue from "@vitejs/plugin-vue";
+import Components from "unplugin-vue-components/vite";
+import { BootstrapVueNextResolver } from "unplugin-vue-components/resolvers";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -16,6 +18,9 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       vue(),
+      Components({
+        resolvers: [BootstrapVueNextResolver()],
+      }),
       createHtmlPlugin({
         minify: false,
         entry: "/src/main.ts",
@@ -31,7 +36,6 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         "@": fileURLToPath(new URL("./src", import.meta.url)),
-        "~bootstrap": "bootstrap",
       },
     },
   };
