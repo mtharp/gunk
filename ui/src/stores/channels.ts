@@ -48,4 +48,16 @@ export const useChannelsStore = defineStore("channels", {
       this.channels[ch.name] = ch;
     },
   },
+  getters: {
+    live(): string[] {
+      const names = [];
+      for (const name in this.channels) {
+        const ch = this.channels[name];
+        if (ch.live) {
+          names.push(ch.name);
+        }
+      }
+      return names.sort();
+    },
+  },
 });

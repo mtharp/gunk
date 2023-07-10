@@ -23,6 +23,20 @@
               ><b-icon-pencil-fill
             /></router-link>
           </li>
+          <li class="nav-item ml-2">
+            <b-avatar
+              v-for="name in channels.live"
+              button
+              rounded
+              @click="pushChannel(name)"
+              :key="name"
+              :src="thumb(name)"
+              size="32px"
+              class="ml-2"
+              v-b-tooltip.hover
+              :title="'Watch ' + name"
+            ></b-avatar>
+          </li>
         </ul>
         <ul class="navbar-nav ml-auto">
           <li class="nav-item" v-if="!loggedIn">
@@ -61,11 +75,11 @@
 import { computed, onMounted } from "vue";
 import { RouterView, RouterLink } from "vue-router";
 import { BIconHouseFill, BIconPencilFill } from "bootstrap-icons-vue";
-// import router from "./router";
 import { useChannelsStore } from "./stores/channels";
 import { useControlsHider } from "./stores/controls-hider";
 import { usePreferences } from "./stores/preferences";
 import { useUserInfoStore } from "./stores/userinfo";
+import router from "./router";
 import ws from "./ws";
 
 const userinfo = useUserInfoStore();
@@ -75,25 +89,15 @@ const preferences = usePreferences();
 const siteName = import.meta.env.VITE_APP_TITLE;
 
 const loggedIn = computed(() => !!userinfo.id);
-// const liveChannels = computed(() => {
-//   const live = [];
-//   for (const name in channels.channels) {
-//     const ch = channels.channels[name];
-//     if (ch.live) {
-//       live.push(ch.name);
-//     }
-//   }
-//   return live.sort();
-// });
 
-// function pushChannel(name: string) {
-//   const route = { name: "watch", params: { channel: name } };
-//   router.push(route);
-// }
+function thumb(name: string) {
+  return channels.channels[name].thumb;
+}
 
-// function thumb(name: string) {
-//   return channels.channels[name].thumb;
-// }
+function pushChannel(name: string) {
+  const route = { name: "watch", params: { channel: name } };
+  router.push(route);
+}
 
 onMounted(() => {
   preferences.fromLocalStorage();
