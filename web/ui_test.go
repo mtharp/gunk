@@ -3,7 +3,7 @@ package web
 import (
 	"testing"
 
-	"eaglesong.dev/gunk/ui2/src/router"
+	"eaglesong.dev/gunk/ui/src/router"
 	"github.com/stretchr/testify/assert"
 )
 

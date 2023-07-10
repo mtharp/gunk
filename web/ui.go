@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"eaglesong.dev/gunk/ui2/src/router"
+	"eaglesong.dev/gunk/ui/src/router"
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog/log"
 )

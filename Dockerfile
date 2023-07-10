@@ -6,14 +6,13 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/root/go/pkg/mod \
     go build -o /gunk -ldflags "-w -s" -v -mod=readonly .
 
-FROM node:lts AS uibuild
+FROM node AS uibuild
 WORKDIR /work
-COPY ui/package.json ui/yarn.lock ./
-RUN --mount=type=cache,target=/root/.yarn yarn install
 COPY ui/ ./
+RUN --mount=type=cache,target=/root/.yarn yarn install
 RUN --mount=type=cache,target=/root/.yarn yarn build
 
-FROM debian:testing-slim
+FROM debian:bookworm-slim
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 RUN --mount=type=cache,target=/var/cache/apt \
     --mount=type=cache,target=/var/lib/apt \

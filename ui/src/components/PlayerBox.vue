@@ -17,7 +17,7 @@
           @click="video!.play()"
           class="big-button"
           v-if="!state.playing"
-          data-bs-toggle="tooltip"
+          v-b-tooltip.hover
           title="Play (k)"
         >
           <b-icon-play-fill />
@@ -26,7 +26,7 @@
           @click="video!.pause()"
           class="big-button"
           v-else
-          data-bs-toggle="tooltip"
+          v-b-tooltip.hover
           title="Pause (k)"
         >
           <b-icon-pause-fill />
@@ -37,7 +37,7 @@
             @click="video!.muted = true"
             class="big-button"
             v-if="!state.muted"
-            data-bs-toggle="tooltip"
+            v-b-tooltip.hover
             title="Mute (m)"
           >
             <b-icon-volume-up-fill />
@@ -46,7 +46,7 @@
             @click="video!.muted = false"
             class="big-button"
             v-else
-            data-bs-toggle="tooltip"
+            v-b-tooltip.hover
             title="Unmute (m)"
           >
             <b-icon-volume-mute-fill />
@@ -59,7 +59,7 @@
               :min="0"
               :max="1"
               :interval="0.01"
-              data-bs-toggle="tooltip"
+              v-b-tooltip.hover
               title="Volume (up/down)"
               @change="
                 video!.volume = state.volume;
@@ -75,7 +75,7 @@
           <div
             v-if="state.playing"
             class="controls-latency"
-            data-bs-toggle="tooltip"
+            v-b-tooltip.hover
             title="Current delay to live stream"
           >
             <b-icon-skip-forward-fill v-if="state.catchingUp" />
@@ -86,7 +86,7 @@
             @click="seekLive"
             v-if="state.atTail"
             class="controls-live text-primary"
-            data-bs-toggle="tooltip"
+            v-b-tooltip.hover
             title="Jump to the latest point in the stream (j)"
           >
             <b-icon-lightning-fill />
@@ -96,7 +96,7 @@
             @click="seekLive"
             v-else
             class="controls-live text-secondary"
-            data-bs-toggle="tooltip"
+            v-b-tooltip.hover
             title="Jump to the latest point in the stream (j)"
           >
             <b-icon-lightning />
@@ -106,7 +106,7 @@
         <div
           v-if="state.playing && rtcActive"
           class="controls-rtclabel text-success"
-          data-bs-toggle="tooltip"
+          v-b-tooltip.hover
           title="Real-time stream has near-zero latency"
         >
           <b-icon-soundwave />WebRTC
@@ -117,70 +117,37 @@
           {{ ch.viewers }}
         </div>
         <!-- settings menu -->
-        <div class="dropdown dropup no-caret">
-          <button
-            class="btn btn-secondary"
-            type="button"
-            data-bs-toggle="dropdown"
-            aria-expanded="false"
-          >
+        <b-dropdown dropup right no-caret>
+          <template v-slot:button-content>
             <b-icon-gear-fill />
-          </button>
-          <form class="dropdown-menu dropdown-menu-end">
-            <!-- for some reason chrome won't open a .m3u8 file directly so don't show the playlist link -->
-            <div v-if="!isWebKit">
-              <a
-                class="dropdown-item"
-                :href="playlistURL"
-                @click="video!.pause()"
-              >
-                <img src="/vlc.png" />
-                Watch in VLC
-              </a>
-            </div>
-            <div>
-              <a
-                class="dropdown-item"
-                :href="ch.live_url"
-                @click.prevent="copyVLC"
-              >
-                <b-icon-clipboard-data />Copy VLC URL
-              </a>
-              <input
-                v-if="state.showCopyVLC"
-                ref="copyVLCInput"
-                :value="ch.live_url"
-                readonly
-              />
-            </div>
-            <div class="dropdown-divider"></div>
-            <div class="ps-3">
-              <div class="form-check">
-                <input
-                  type="checkbox"
-                  class="form-check-input"
-                  id="rtc"
-                  v-model="preferences.useRTC"
-                />
-                <label class="form-check-label" for="rtc">Use WebRTC</label>
-              </div>
-              <div class="form-check">
-                <input
-                  type="checkbox"
-                  class="form-check-input"
-                  id="ll"
-                  v-model="preferences.lowLatency"
-                />
-                <label class="form-check-label" for="ll">Low Latency</label>
-              </div>
-            </div>
-          </form>
-        </div>
+          </template>
+          <!-- for some reason chrome won't open a .m3u8 file directly so don't show the playlist link -->
+          <b-dropdown-item
+            :href="playlistURL"
+            @click="video!.pause()"
+            v-if="!isWebKit"
+          >
+            <img src="/vlc.png" />
+            Watch in VLC
+          </b-dropdown-item>
+          <b-dropdown-item :href="ch.live_url" @click.prevent="copyVLC">
+            <b-icon-clipboard-data /> Copy VLC URL
+          </b-dropdown-item>
+          <b-dropdown-divider />
+          <div class="ps-3">
+            <b-form-checkbox v-model="preferences.useRTC" :disabled="!ch.rtc"
+              >Use WebRTC</b-form-checkbox
+            >
+            <b-form-checkbox v-model="preferences.lowLatency"
+              >Low Latency</b-form-checkbox
+            >
+          </div>
+        </b-dropdown>
         <!-- fullscreen -->
         <button
           v-if="hasFullscreen"
           @click="toggleFullscreen"
-          data-bs-toggle="tooltip"
+          v-b-tooltip.hover
           :title="state.isFullscreen ? 'Exit Fullscreen (f)' : 'Fullscreen (f)'"
         >
           <b-icon-fullscreen v-if="!state.isFullscreen" />
@@ -197,7 +164,6 @@ import "vue-slider-component/theme/antd.css";
 
 import {
   computed,
-  nextTick,
   onBeforeMount,
   onMounted,
   onUnmounted,
@@ -230,9 +196,8 @@ import {
 } from "bootstrap-icons-vue";
 
 const props = defineProps<PlayerProperties>();
-const container = ref<HTMLElement | null>(null);
-const video = ref<HTMLVideoElement | null>(null);
-const copyVLCInput = ref<HTMLInputElement | null>(null);
+const container = ref<HTMLElement>();
+const video = ref<HTMLVideoElement>();
 const controlsHider = useControlsHider();
 const preferences = usePreferences();
 
@@ -249,7 +214,6 @@ const state = reactive({
   keyPressed: false,
   atTail: false,
   catchingUp: false,
-  showCopyVLC: false,
 
   isFullscreen: document.fullscreenElement !== null,
 });
@@ -266,9 +230,11 @@ onBeforeMount(() => {
   state.poster = props.ch.thumb;
 });
 onMounted(() => {
-  const v = video.value as HTMLVideoElement;
-  controlsHider.attachPlayer(v);
-  player = choosePlayer(v, props);
+  if (!video.value) {
+    return;
+  }
+  controlsHider.attachPlayer(props);
+  player = choosePlayer(video.value, props);
   document.addEventListener("fullscreenchange", onFullscreenChanged);
   document.addEventListener("keydown", onKey);
   latencyTimer = window.setInterval(updateLatency, 1000);
@@ -284,7 +250,7 @@ onUnmounted(() => {
     window.clearInterval(latencyTimer);
     latencyTimer = null;
   }
-  controlsHider.detachPlayer(video.value);
+  controlsHider.detachPlayer(props);
   player?.destroy();
 });
 
@@ -321,12 +287,7 @@ function updateLatency() {
 }
 // copy VLC URL to clipboard
 async function copyVLC() {
-  state.showCopyVLC = true;
-  await nextTick();
-  copyVLCInput.value?.select();
-  document.execCommand("copy");
-  await nextTick();
-  state.showCopyVLC = false;
+  return navigator.clipboard.writeText(props.ch.live_url);
   // this.$bvToast.toast(
   //   "Open VLC, press Ctrl-N and paste to play the stream",
   //   {
@@ -475,7 +436,7 @@ function onKey(ev: KeyboardEvent) {
   min-width: 12rem;
 }
 
-.controls .dropdown button {
+.controls .dropdown-toggle {
   font-size: 0.75rem;
 }
 
@@ -485,9 +446,8 @@ function onKey(ev: KeyboardEvent) {
   height: 20px;
 }
 
-.controls .dropdown svg {
-  margin-left: -2px;
-  margin-right: 0.3rem;
+.controls .dropdown-item svg {
+  margin-right: 0.2rem;
 }
 
 /* controls elements */
