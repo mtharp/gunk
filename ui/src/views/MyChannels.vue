@@ -80,13 +80,13 @@
               </b-form>
             </b-card-text>
           </b-tab>
-          <b-tab title="RIST (alpha)">
+          <b-tab title="WHIP (beta)">
             <b-card-text>
               <b-form v-if="state.selected">
-                <b-form-group label="Server (custom service)">
-                  <b-form-input readonly :value="state.selected.rist_url" />
+                <b-form-group label="Server (WHIP service)">
+                  <b-form-input readonly :value="state.selected.whip_url" />
                 </b-form-group>
-                <b-form-group label="Stream Key">
+                <b-form-group label="Bearer Token">
                   <b-form-input
                     v-show="state.revealKey"
                     readonly
@@ -150,6 +150,7 @@ interface ChannelDef {
   rist_url?: string;
   rtmp_dir?: string;
   rtmp_base?: string;
+  whip_url?: string;
 }
 
 interface ChannelsResponse {

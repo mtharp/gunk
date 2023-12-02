@@ -92,11 +92,11 @@ func main() {
 		}
 	}
 	switch viper.GetString("web_mode") {
-	case "dash", "":
+	case "dash":
 		s.Channels.PublishMode = hls.ModeSeparateTracks
 	case "hls":
 		s.Channels.PublishMode = hls.ModeSingleTrack
-	case "both":
+	case "both", "":
 		s.Channels.PublishMode = hls.ModeSingleAndSeparate
 	default:
 		log.Fatal().Msg("WEB_MODE must be one of: dash, hls, both")

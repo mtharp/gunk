@@ -17,9 +17,10 @@ type ChannelDef struct {
 	RTMPBase string `json:"rtmp_base"`
 
 	RISTUrl string `json:"rist_url"`
+	WHIPUrl string `json:"whip_url"`
 }
 
-func (d *ChannelDef) SetURL(base string, rist *url.URL) {
+func (d *ChannelDef) SetURL(base string, rist *url.URL, webBase string) {
 	v := url.Values{"key": []string{d.Key}}
 	d.RTMPDir = base
 	d.RTMPBase = url.PathEscape(d.Name) + "?" + v.Encode()
@@ -31,6 +32,7 @@ func (d *ChannelDef) SetURL(base string, rist *url.URL) {
 		u2.RawQuery = q.Encode()
 		d.RISTUrl = u2.String()
 	}
+	d.WHIPUrl = webBase + "/rtc/" + url.PathEscape(d.Name)
 }
 
 func ListChannelDefs(ctx context.Context, userID string) (defs []*ChannelDef, err error) {
