@@ -3,6 +3,7 @@ package playrtc
 import (
 	"context"
 
+	"eaglesong.dev/gunk/internal/rtcengine"
 	"github.com/nareix/joy4/av"
 	"github.com/pion/webrtc/v3"
 	"github.com/rs/zerolog"
@@ -12,13 +13,13 @@ import (
 type ViewerFunc func(int)
 type CandidateSender func(webrtc.ICECandidateInit)
 
-func (e *Engine) OfferToSend(ctx context.Context, src av.Demuxer, addViewer ViewerFunc, sendCandidate CandidateSender) (*Sender, error) {
+func OfferToSend(ctx context.Context, e *rtcengine.Engine, src av.Demuxer, addViewer ViewerFunc, sendCandidate CandidateSender) (*Sender, error) {
 	// build tracks
 	streams, err := src.Streams()
 	if err != nil {
 		return nil, err
 	}
-	pc, err := e.newConnection()
+	pc, _, err := e.Connection()
 	if err != nil {
 		return nil, err
 	}

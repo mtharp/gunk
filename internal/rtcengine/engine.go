@@ -1,4 +1,4 @@
-package playrtc
+package rtcengine
 
 import (
 	"context"
@@ -9,12 +9,15 @@ import (
 	"time"
 
 	"github.com/pion/ice/v2"
+	"github.com/pion/interceptor"
+	"github.com/pion/interceptor/pkg/stats"
 	"github.com/pion/webrtc/v3"
 	"github.com/rs/zerolog/log"
 )
 
 type Engine struct {
 	AdvertiseHost string
+	ReceiveWindow time.Duration
 
 	resolver *net.Resolver
 	media    *webrtc.MediaEngine
@@ -22,7 +25,7 @@ type Engine struct {
 	conf     webrtc.Configuration
 }
 
-func NewEngine(advertiseHost string) (*Engine, error) {
+func New(advertiseHost string) (*Engine, error) {
 	m := new(webrtc.MediaEngine)
 	if err := m.RegisterDefaultCodecs(); err != nil {
 		return nil, err
@@ -68,7 +71,7 @@ func NewEngine(advertiseHost string) (*Engine, error) {
 	return e, nil
 }
 
-func (e *Engine) newConnection() (*webrtc.PeerConnection, error) {
+func (e *Engine) Connection() (*webrtc.PeerConnection, stats.Getter, error) {
 	var se webrtc.SettingEngine
 	types := []webrtc.NetworkType{webrtc.NetworkTypeUDP4}
 	if e.AdvertiseHost != "" {
@@ -105,6 +108,24 @@ func (e *Engine) newConnection() (*webrtc.PeerConnection, error) {
 		se.SetLite(true)
 		conf.ICEServers = nil
 	}
-	api := webrtc.NewAPI(webrtc.WithMediaEngine(e.media), webrtc.WithSettingEngine(se))
-	return api.NewPeerConnection(conf)
+	intReg := new(interceptor.Registry)
+	if err := webrtc.RegisterDefaultInterceptors(e.media, intReg); err != nil {
+		return nil, nil, fmt.Errorf("configuring webrtc interceptors: %w", err)
+	}
+	sFact, err := stats.NewInterceptor()
+	if err != nil {
+		return nil, nil, fmt.Errorf("configuring stats interceptor: %w", err)
+	}
+	var sgetter stats.Getter
+	sFact.OnNewPeerConnection(func(s string, g stats.Getter) {
+		sgetter = g
+	})
+	intReg.Add(sFact)
+	api := webrtc.NewAPI(
+		webrtc.WithMediaEngine(e.media),
+		webrtc.WithInterceptorRegistry(intReg),
+		webrtc.WithSettingEngine(se),
+	)
+	pc, err := api.NewPeerConnection(conf)
+	return pc, sgetter, err
 }

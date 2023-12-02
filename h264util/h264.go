@@ -17,7 +17,7 @@ func WriteAnnexB(w *bytes.Buffer, nalus [][]byte) {
 }
 
 // WriteAnnexBPacket writes a H264 packet in Annex B format.
-// If the packet is a keyframe, prepend codec information (SPS and PPS) as well.
+// If the packet is a keyframe, prepend codec information (SPS and PPS) as well.
 func WriteAnnexBPacket(w *bytes.Buffer, pkt av.Packet, cd h264parser.CodecData) {
 	nalus, _ := h264parser.SplitNALUs(pkt.Data)
 	if pkt.IsKeyFrame {

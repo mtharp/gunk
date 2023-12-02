@@ -2,10 +2,11 @@ package web
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"sync"
 
 	"eaglesong.dev/gunk/ingest"
@@ -53,6 +54,9 @@ func (s *Server) Handler() http.Handler {
 	// video
 	r.HandleFunc("/live/{channel}.ts", corsOK(s.viewPlayTS)).Methods("GET", "OPTIONS").Name("live")
 	r.HandleFunc("/live/{channel}.ts", s.viewPublishTS).Methods("PUT", "POST")
+	r.HandleFunc("/live/{channel}.mp4", corsOK(s.viewPlayMP4)).Methods("GET", "OPTIONS")
+	r.HandleFunc("/rtc/{channel}", s.viewPublishRTC).Methods("POST")
+	r.HandleFunc("/rtc/{channel}/{id}", s.viewDeleteRTC).Methods("DELETE").Name("rtc_id")
 	r.HandleFunc("/live/{channel}.m3u8", corsOK(s.viewPlaylist)).Methods("GET", "HEAD", "OPTIONS")
 	r.HandleFunc("/hd/{channel}/{filename}", corsOK(s.viewPlayWeb)).Methods("GET", "HEAD", "OPTIONS").Name("web")
 	// UI
@@ -93,14 +97,27 @@ func (s *Server) checkAuth(rw http.ResponseWriter, req *http.Request) string {
 	return ""
 }
 
-func parseRequest(rw http.ResponseWriter, req *http.Request, d interface{}) bool {
-	blob, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		hlog.FromRequest(req).Err(err).Msg("error reading request")
-		http.Error(rw, "", 500)
-		return false
+func readRequest(rw http.ResponseWriter, req *http.Request) []byte {
+	const maxBody = 100e3
+	if req.ContentLength > maxBody {
+		http.Error(rw, "", http.StatusRequestEntityTooLarge)
+		return nil
 	}
-	if err := json.Unmarshal(blob, d); err != nil {
+	blob, err := io.ReadAll(io.LimitReader(req.Body, maxBody+1))
+	if err != nil {
+		http.Error(rw, "io error", http.StatusBadRequest)
+		return nil
+	} else if len(blob) >= maxBody {
+		http.Error(rw, "", http.StatusRequestEntityTooLarge)
+		return nil
+	}
+	return blob
+}
+
+func parseRequest(rw http.ResponseWriter, req *http.Request, d interface{}) bool {
+	if blob := readRequest(rw, req); blob == nil {
+		return false
+	} else if err := json.Unmarshal(blob, d); err != nil {
 		hlog.FromRequest(req).Err(err).Msg("error parsing request")
 		http.Error(rw, "invalid JSON in request", 400)
 		return false
@@ -108,14 +125,16 @@ func parseRequest(rw http.ResponseWriter, req *http.Request, d interface{}) bool
 	return true
 }
 
-func writeJSON(rw http.ResponseWriter, d interface{}) {
-	rw.Header().Set("Content-Type", "application/json")
+func writeJSON(rw http.ResponseWriter, d any) {
+	var blob []byte
 	if d == nil {
-		rw.Write([]byte("{}"))
-		return
+		blob = []byte("{}")
+	} else {
+		blob, _ = json.Marshal(d)
 	}
-	blob, _ := json.Marshal(d)
-	rw.Write(blob)
+	rw.Header().Set("Content-Length", strconv.FormatInt(int64(len(blob)), 10))
+	rw.Header().Set("Content-Type", "application/json")
+	_, _ = rw.Write(blob)
 }
 
 func corsOK(f http.HandlerFunc) http.HandlerFunc {

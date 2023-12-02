@@ -5,9 +5,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"eaglesong.dev/gunk/ingest/whip"
+	"eaglesong.dev/gunk/internal/rtcengine"
 	"eaglesong.dev/gunk/model"
 	"eaglesong.dev/gunk/sinks/grabber"
-	"eaglesong.dev/gunk/sinks/playrtc"
 	"eaglesong.dev/hls"
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/av/pubsub"
@@ -23,15 +24,20 @@ type Manager struct {
 	PublishMode  hls.Mode
 	WorkDir      string
 	RTCHost      string
+	RTCWindow    time.Duration
 
 	channels sync.Map
-	rtc      *playrtc.Engine
+	rtc      *rtcengine.Engine
 }
 
 func (m *Manager) Initialize() error {
 	var err error
-	m.rtc, err = playrtc.NewEngine(m.RTCHost)
-	return err
+	m.rtc, err = rtcengine.New(m.RTCHost)
+	if err != nil {
+		return err
+	}
+	m.rtc.ReceiveWindow = m.RTCWindow
+	return nil
 }
 
 type channel struct {
@@ -39,6 +45,10 @@ type channel struct {
 	ingest    *pubsub.Queue
 	aac, opus *pubsub.Queue
 	web       *hls.Publisher
+
+	whip   *whip.Receiver
+	whipID string
+
 	stoppedAt time.Time
 	name      string
 

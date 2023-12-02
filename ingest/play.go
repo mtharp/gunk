@@ -34,6 +34,18 @@ func (m *Manager) ServeTS(rw http.ResponseWriter, req *http.Request, name string
 	return copyStream(req.Context(), muxer, src)
 }
 
+func (m *Manager) ServeMP4(rw http.ResponseWriter, req *http.Request, name string) error {
+	ch := m.channel(name)
+	p := ch.getWeb()
+	if p == nil {
+		return ErrNoChannel
+	}
+	ch.addViewer(1)
+	defer ch.addViewer(-1)
+	p.Tail(rw, req)
+	return nil
+}
+
 func (m *Manager) ServeWeb(rw http.ResponseWriter, req *http.Request, name string) error {
 	if req.Header.Get("Origin") != "" {
 		rw.Header().Set("Access-Control-Allow-Origin", "*")
@@ -69,7 +81,7 @@ func (m *Manager) OfferSDP(ctx context.Context, name string, sendCandidate playr
 	addViewer := func(delta int) { ch.addViewer(int32(delta)) }
 	l := zerolog.Ctx(ctx).With().Str("channel", name).Logger()
 	ctx = l.WithContext(ctx)
-	return m.rtc.OfferToSend(ctx, src, addViewer, sendCandidate)
+	return playrtc.OfferToSend(ctx, m.rtc, src, addViewer, sendCandidate)
 }
 
 func (m *Manager) PopulateLive(infos []*model.ChannelInfo) {

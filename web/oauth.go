@@ -2,12 +2,10 @@ package web
 
 import (
 	"crypto/hmac"
-	"crypto/rand"
-	"encoding/base64"
 	"errors"
-	"io"
 	"net/http"
 
+	"eaglesong.dev/gunk/internal"
 	"github.com/rs/zerolog/hlog"
 	"golang.org/x/oauth2"
 )
@@ -49,11 +47,7 @@ func (s *Server) viewOauthLogin(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "oauth not configured", http.StatusBadRequest)
 		return
 	}
-	sb := make([]byte, 9)
-	if _, err := io.ReadFull(rand.Reader, sb); err != nil {
-		panic(err)
-	}
-	state := base64.RawURLEncoding.EncodeToString(sb)
+	state := internal.RandomID(9)
 	s.setCookie(rw, stateCookie, state, stateCookieExpires)
 	http.Redirect(rw, req, s.oauth.AuthCodeURL(state), http.StatusFound)
 }

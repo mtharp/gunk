@@ -1,12 +1,10 @@
 package web
 
 import (
-	"crypto/rand"
-	"encoding/hex"
-	"io"
 	"sync"
 	"time"
 
+	"eaglesong.dev/gunk/internal"
 	"eaglesong.dev/gunk/sinks/playrtc"
 )
 
@@ -33,13 +31,9 @@ func (s *Server) newSession(conn *wsConn, resume string) *wsSession {
 	}
 	if n == nil {
 		// new session
-		b := make([]byte, 16)
-		if _, err := io.ReadFull(rand.Reader, b); err != nil {
-			panic("random source unavailable")
-		}
 		n = &wsSession{
 			server: s,
-			ID:     hex.EncodeToString(b),
+			ID:     internal.RandomID(16),
 			send:   make(chan wsMsg, 10),
 		}
 		s.sessions[n.ID] = n

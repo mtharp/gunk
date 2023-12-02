@@ -1351,9 +1351,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"dashjs@npm:^4.4.1":
-  version: 4.7.1
-  resolution: "dashjs@npm:4.7.1"
+"dashjs@npm:^4.7.2":
+  version: 4.7.2
+  resolution: "dashjs@npm:4.7.2"
   dependencies:
     bcp-47-match: ^1.0.3
     bcp-47-normalize: ^1.1.1
@@ -1365,7 +1365,7 @@ __metadata:
     localforage: ^1.7.1
     path-browserify: ^1.0.1
     ua-parser-js: ^1.0.2
-  checksum: d69ca8178c221ed0b9a746697c087de3f6953e6aff71e1242d972091116c0700e84975d7fc0d6e7b03e19b2aaa63e85afd5e716de6415617e503b6855e0a5cde
+  checksum: 617793067d8eb593ac44b3ca0fad6c6c7d14b6362d9eaebcafa04bcffe588eed3ca92128f495596f04b438b3d5feacd604b46c574ff7810a469ed645467422b6
   languageName: node
   linkType: hard
 
@@ -2385,7 +2385,7 @@ __metadata:
     bootstrap: ^5.2.1
     bootstrap-icons-vue: ^1.8.1
     bootstrap-vue-next: ^0.9.23
-    dashjs: ^4.4.1
+    dashjs: ^4.7.2
     eslint: ^8.22.0
     eslint-plugin-vue: ^9.3.0
     npm-run-all: ^4.1.5

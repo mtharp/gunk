@@ -68,8 +68,7 @@ func (m *Manager) Publish(ctx context.Context, auth model.ChannelAuth, src av.De
 	p := ch.setStream(q, aacq, opusq, m.WorkDir, m.PublishMode)
 	defer func() {
 		l.Info().Msg("stopped publishing")
-		ch.stopStream(q)
-		if m.PublishEvent != nil {
+		if ch.stopStream(q) && m.PublishEvent != nil {
 			m.PublishEvent(auth, false, grabber.Result{})
 		}
 	}()
@@ -134,17 +133,18 @@ func (ch *channel) setStream(q, aacq, opusq *pubsub.Queue, workDir string, mode 
 	return ch.web
 }
 
-func (ch *channel) stopStream(q *pubsub.Queue) {
+func (ch *channel) stopStream(q *pubsub.Queue) bool {
 	ch.mu.Lock()
 	defer ch.mu.Unlock()
 	if ch.ingest != q {
-		return
+		return false
 	}
 	atomic.StoreUintptr(&ch.live, uintptr(stateOffline))
 	ch.ingest = nil
 	ch.aac = nil
 	ch.opus = nil
 	ch.stoppedAt = time.Now()
+	return true
 }
 
 func (ch *channel) copyStream(ctx context.Context, dest *pubsub.Queue, src av.Demuxer) error {

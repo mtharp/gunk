@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -29,9 +28,9 @@ import (
 )
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
 	_ = godotenv.Load(".env")
 	_ = godotenv.Load(".env.local")
+	viper.SetDefault("rtc_window", "1s")
 	viper.AutomaticEnv()
 
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
@@ -59,6 +58,7 @@ func main() {
 		Channels: ingest.Manager{
 			OpusBitrate: viper.GetInt("opus_bitrate"),
 			RTCHost:     viper.GetString("rtc_host"),
+			RTCWindow:   viper.GetDuration("rtc_window"),
 		},
 	}
 	s.SetOauth(viper.GetString("client_id"), viper.GetString("client_secret"))
@@ -123,6 +123,7 @@ func main() {
 	}
 
 	eg := new(errgroup.Group)
+	// rtmp.Debug = true
 	rs := &irtmp.Server{
 		Server: rtmp.Server{
 			Addr: viper.GetString("listen_rtmp"),

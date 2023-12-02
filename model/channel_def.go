@@ -2,11 +2,9 @@ package model
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
-	"io"
 	"net/url"
 
+	"eaglesong.dev/gunk/internal"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -54,11 +52,7 @@ func ListChannelDefs(ctx context.Context, userID string) (defs []*ChannelDef, er
 }
 
 func CreateChannel(ctx context.Context, userID, name string) (def *ChannelDef, err error) {
-	b := make([]byte, 24)
-	if _, err = io.ReadFull(rand.Reader, b); err != nil {
-		return
-	}
-	key := hex.EncodeToString(b)
+	key := internal.RandomID(24)
 	_, err = db.Exec(ctx, "INSERT INTO channel_defs (user_id, name, key, announce) VALUES ($1, $2, $3, true)",
 		userID, name, key)
 	if err != nil {
