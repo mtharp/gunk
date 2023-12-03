@@ -29,6 +29,7 @@ type senderTrack struct {
 	rate uint64
 	got  bool
 	buf  bytes.Buffer
+	ssrc webrtc.SSRC
 }
 
 func newSenderTrack(cd av.CodecData) (*senderTrack, error) {
@@ -70,7 +71,8 @@ func (s *senderTrack) Bind(t webrtc.TrackLocalContext) (webrtc.RTPCodecParameter
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	// log.Println("bound", codec.PayloadType, codec.MimeType, codec.SDPFmtpLine)
+	s.ssrc = t.SSRC()
+	// log.Println("bound", codec.PayloadType, codec.MimeType, codec.SDPFmtpLine, t.SSRC())
 	if s.packetizer != nil {
 		return codec, nil
 	}

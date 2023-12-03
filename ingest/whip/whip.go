@@ -180,14 +180,18 @@ func (r *Receiver) trackStats(tr *webrtc.TrackRemote) {
 		Uint32("ssrc", uint32(tr.SSRC())).
 		Logger()
 	ssrc := uint32(tr.SSRC())
-	t := time.NewTicker(5 * time.Second)
+	t := time.NewTicker(15 * time.Second)
 	defer t.Stop()
 	for {
 		select {
 		case <-r.ctx.Done():
 			return
 		case <-t.C:
-			st := r.stats.Get(ssrc).InboundRTPStreamStats
+			stats := r.stats.Get(ssrc)
+			if stats == nil {
+				continue
+			}
+			st := stats.InboundRTPStreamStats
 			statLog.Info().
 				Uint64("rx_packets", st.PacketsReceived).
 				Uint64("rx_bytes", st.BytesReceived).

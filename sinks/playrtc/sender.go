@@ -1,18 +1,21 @@
 package playrtc
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"sync/atomic"
 	"time"
 
 	"github.com/nareix/joy4/av"
+	"github.com/pion/interceptor/pkg/stats"
 	"github.com/pion/webrtc/v3"
 	"github.com/rs/zerolog"
 )
 
 type Sender struct {
 	pc     *webrtc.PeerConnection
+	stats  stats.Getter
 	state  uintptr
 	src    av.Demuxer
 	tracks []*senderTrack
@@ -105,6 +108,9 @@ func (s *Sender) serveOnce() error {
 	s.addViewer(1)
 	defer s.addViewer(-1)
 	defer s.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go s.trackStats(ctx)
 	const rtcTimeout = time.Minute
 	deadline := time.Now().Add(rtcTimeout)
 	for {
@@ -132,4 +138,35 @@ func (s *Sender) serveOnce() error {
 		}
 	}
 	return nil
+}
+
+func (s *Sender) trackStats(ctx context.Context) {
+	if s.stats == nil {
+		return
+	}
+	t := time.NewTicker(60 * time.Second)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+		for _, tr := range s.tracks {
+			stats := s.stats.Get(uint32(tr.ssrc))
+			if stats == nil {
+				continue
+			}
+			st := stats.OutboundRTPStreamStats
+			s.log.Info().
+				Str("mtype", tr.Codec().MimeType).
+				Uint32("ssrc", uint32(tr.ssrc)).
+				Uint64("tx_packets", st.PacketsSent).
+				Uint64("tx_bytes", st.BytesSent).
+				Uint32("fir_count", st.FIRCount).
+				Uint32("pli_count", st.PLICount).
+				Uint32("nack_count", st.NACKCount).
+				Msg("RTC player stats")
+		}
+	}
 }

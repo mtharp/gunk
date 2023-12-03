@@ -16,7 +16,9 @@ FROM debian:bookworm-slim
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 RUN --mount=type=cache,target=/var/cache/apt \
     --mount=type=cache,target=/var/lib/apt \
-    apt update && apt install -y ca-certificates ffmpeg
+    apt update && apt install -y ca-certificates ffmpeg brotli
 COPY --from=uibuild /work/dist /usr/share/gunk/ui
+#RUN find /usr/share/gunk/ui -type f -exec brotli -9kvs {} +
+RUN brotli -9kv /usr/share/gunk/ui/assets/*
 COPY --from=gobuild /gunk /usr/bin/gunk
 CMD ["/usr/bin/gunk"]

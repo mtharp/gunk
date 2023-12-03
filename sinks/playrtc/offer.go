@@ -19,12 +19,13 @@ func OfferToSend(ctx context.Context, e *rtcengine.Engine, src av.Demuxer, addVi
 	if err != nil {
 		return nil, err
 	}
-	pc, _, err := e.Connection()
+	pc, stats, err := e.Connection()
 	if err != nil {
 		return nil, err
 	}
 	s := &Sender{
 		pc:            pc,
+		stats:         stats,
 		src:           src,
 		tracks:        make([]*senderTrack, len(streams)),
 		addViewer:     addViewer,
