@@ -18,7 +18,7 @@ RUN --mount=type=cache,target=/var/cache/apt \
     --mount=type=cache,target=/var/lib/apt \
     apt update && apt install -y ca-certificates ffmpeg brotli
 COPY --from=uibuild /work/dist /usr/share/gunk/ui
-#RUN find /usr/share/gunk/ui -type f -exec brotli -9kvs {} +
-RUN brotli -9kv /usr/share/gunk/ui/assets/*
+RUN brotli -9kv /usr/share/gunk/ui/*.html /usr/share/gunk/ui/assets/*.css /usr/share/gunk/ui/assets/*.js
+RUN gzip -9kv /usr/share/gunk/ui/*.html /usr/share/gunk/ui/assets/*.css /usr/share/gunk/ui/assets/*.js
 COPY --from=gobuild /gunk /usr/bin/gunk
 CMD ["/usr/bin/gunk"]

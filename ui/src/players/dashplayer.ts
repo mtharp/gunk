@@ -8,7 +8,7 @@ export default class DASHPlayer {
   constructor(
     video: HTMLVideoElement,
     webURL: string,
-    lowLatencyMode: boolean
+    lowLatencyMode: boolean,
   ) {
     autoplay(video);
     this.video = video;

@@ -31,7 +31,7 @@ import {
 } from "@/stores/channels";
 import { usePreferences } from "@/stores/preferences";
 import { computed } from "vue";
-import PlayerBox from "@/components/PlayerBox.vue";
+import PlayerBox from "@/components/player-box.vue";
 
 const props = defineProps<{
   channel: string;

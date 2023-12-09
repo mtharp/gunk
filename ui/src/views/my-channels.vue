@@ -204,7 +204,7 @@ function doShowDelete(def: ChannelDef) {
 
 async function doFinishDelete() {
   await axios.delete(
-    "/api/mychannels/" + encodeURIComponent(state.selected.name)
+    "/api/mychannels/" + encodeURIComponent(state.selected.name),
   );
   state.newName = state.selected.name;
   state.defs.splice(state.defs.indexOf(state.selected), 1);

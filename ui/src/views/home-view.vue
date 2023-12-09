@@ -30,7 +30,7 @@
 <script setup lang="ts">
 import { useChannelsStore } from "@/stores/channels";
 import { BIconEyeFill } from "bootstrap-icons-vue";
-import TimeAgo from "@/components/TimeAgo";
+import TimeAgo from "@/components/time-ago";
 
 const channels = useChannelsStore();
 

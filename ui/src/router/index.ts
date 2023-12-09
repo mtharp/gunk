@@ -7,17 +7,17 @@ const router = createRouter({
     {
       path: "/",
       name: "home",
-      component: () => import("@/views/HomeView.vue"),
+      component: () => import("@/views/home-view.vue"),
     },
     {
       path: "/mychannels",
       name: "mychannels",
-      component: () => import("@/views/MyChannels.vue"),
+      component: () => import("@/views/my-channels.vue"),
     },
     {
       path: "/watch/:channel",
       name: "watch",
-      component: () => import("@/views/WatchView.vue"),
+      component: () => import("@/views/watch-view.vue"),
       props: true,
     },
   ],

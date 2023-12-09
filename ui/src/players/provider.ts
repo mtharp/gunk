@@ -18,7 +18,7 @@ export interface PlayerProperties {
 
 export function choosePlayer(
   video: HTMLVideoElement,
-  props: PlayerProperties
+  props: PlayerProperties,
 ): PlayerProvider {
   if (props.rtcActive) {
     return new RTCPlayer(video, props.ch.name);

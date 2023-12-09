@@ -53,18 +53,18 @@ export default defineComponent({
         seconds <= 5
           ? "just now"
           : seconds < MINUTE
-          ? pluralOrSingular(seconds, currentLocale[0])
-          : seconds < HOUR
-          ? pluralOrSingular(seconds / MINUTE, currentLocale[1])
-          : seconds < DAY
-          ? pluralOrSingular(seconds / HOUR, currentLocale[2])
-          : seconds < WEEK
-          ? pluralOrSingular(seconds / DAY, currentLocale[3])
-          : seconds < MONTH
-          ? pluralOrSingular(seconds / WEEK, currentLocale[4])
-          : seconds < YEAR
-          ? pluralOrSingular(seconds / MONTH, currentLocale[5])
-          : pluralOrSingular(seconds / YEAR, currentLocale[6]);
+            ? pluralOrSingular(seconds, currentLocale[0])
+            : seconds < HOUR
+              ? pluralOrSingular(seconds / MINUTE, currentLocale[1])
+              : seconds < DAY
+                ? pluralOrSingular(seconds / HOUR, currentLocale[2])
+                : seconds < WEEK
+                  ? pluralOrSingular(seconds / DAY, currentLocale[3])
+                  : seconds < MONTH
+                    ? pluralOrSingular(seconds / WEEK, currentLocale[4])
+                    : seconds < YEAR
+                      ? pluralOrSingular(seconds / MONTH, currentLocale[5])
+                      : pluralOrSingular(seconds / YEAR, currentLocale[6]);
 
       return ret;
     },
@@ -83,7 +83,7 @@ export default defineComponent({
           title: this.timeForTitle,
         },
       },
-      this.timeago
+      this.timeago,
     );
   },
   methods: {
