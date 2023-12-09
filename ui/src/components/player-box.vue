@@ -229,12 +229,12 @@ onBeforeMount(() => {
   // instead.
   state.poster = props.ch.thumb;
 });
-onMounted(() => {
+onMounted(async () => {
   if (!video.value) {
     return;
   }
   controlsHider.attachPlayer(props);
-  player = choosePlayer(video.value, props);
+  player = await choosePlayer(video.value, props);
   document.addEventListener("fullscreenchange", onFullscreenChanged);
   document.addEventListener("keydown", onKey);
   latencyTimer = window.setInterval(updateLatency, 1000);

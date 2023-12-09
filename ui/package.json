@@ -17,6 +17,7 @@
     "bootstrap-icons-vue": "^1.11.1",
     "bootstrap-vue-next": "^0.15.5",
     "dashjs": "^4.7.3",
+    "hls.js": "^1.4.13",
     "pinia": "^2.1.7",
     "vue": "^3.3.11",
     "vue-router": "^4.2.5",

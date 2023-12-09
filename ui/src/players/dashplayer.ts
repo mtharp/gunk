@@ -1,7 +1,7 @@
 import dashjs, { MediaPlayer, MediaPlayerSettingClass } from "dashjs";
 import autoplay from "./autoplay";
 
-export default class DASHPlayer {
+export class DASHPlayer {
   video: HTMLVideoElement;
   stream: dashjs.MediaPlayerClass;
 

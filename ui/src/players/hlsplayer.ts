@@ -1,14 +1,14 @@
 import Hls, { type HlsConfig } from "hls.js";
 import autoplay from "./autoplay";
 
-export default class HLSPlayer {
+export class HLSPlayer {
   video: HTMLVideoElement;
   stream: Hls;
 
   constructor(
     video: HTMLVideoElement,
     webURL: string,
-    lowLatencyMode: boolean
+    lowLatencyMode: boolean,
   ) {
     autoplay(video);
     this.video = video;

@@ -1,5 +1,3 @@
-import DASHPlayer from "./dashplayer";
-// import HLSPlayer from "./hlsplayer";
 import RTCPlayer from "./rtcplayer";
 import NativePlayer, { nativeRequired } from "./nativeplayer";
 import type { ChannelInfo } from "@/stores/channels";
@@ -16,17 +14,19 @@ export interface PlayerProperties {
   lowLatency: boolean;
 }
 
-export function choosePlayer(
+export async function choosePlayer(
   video: HTMLVideoElement,
   props: PlayerProperties,
-): PlayerProvider {
+): Promise<PlayerProvider> {
   if (props.rtcActive) {
     return new RTCPlayer(video, props.ch.name);
   } else if (nativeRequired()) {
     return new NativePlayer(video, props.ch.native_url);
-  } /*if (props.ch.web_url.endsWith(".mpd"))*/ else {
+  } else if (props.ch.web_url.endsWith(".mpd")) {
+    const { DASHPlayer } = await import("./dashplayer");
     return new DASHPlayer(video, props.ch.web_url, props.lowLatency);
-  } /* else {
+  } else {
+    const { HLSPlayer } = await import("./hlsplayer");
     return new HLSPlayer(video, props.ch.web_url, props.lowLatency);
-  }*/
+  }
 }
