@@ -2,10 +2,12 @@ package web
 
 import (
 	"errors"
+	"fmt"
 	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/rs/zerolog/hlog"
@@ -71,7 +73,10 @@ func (s staticServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if ctype == "" {
 		ctype = "application/octet-stream"
 	}
+	rw.Header().Set("Content-Length", strconv.FormatInt(st.Size(), 10))
 	rw.Header().Set("Content-Type", ctype)
+	rw.Header().Set("Etag", fmt.Sprintf("\"%x-%x\"", st.ModTime().UnixNano(), st.Size()))
+	rw.Header().Set("Vary", "Accept-Encoding")
 	http.ServeContent(rw, req, "", st.ModTime(), f)
 }
 

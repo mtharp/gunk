@@ -4,6 +4,7 @@ WORKDIR /work
 COPY . ./
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/root/go/pkg/mod \
+    go test -v ./... && \
     go build -o /gunk -ldflags "-w -s" -v -mod=readonly .
 
 FROM node AS uibuild

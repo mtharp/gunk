@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 
 	"eaglesong.dev/gunk/ui/src/router"
 	"github.com/gorilla/mux"
@@ -28,6 +27,7 @@ func uiRoutes(r *mux.Router) {
 	} else {
 		uiLoc = filepath.Clean(uiLoc)
 		handler = staticServer{Root: uiLoc}
+		r.PathPrefix("/assets/").Handler(cacheImmutable(handler))
 	}
 	indexHandler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		req.URL.Path = "/"
@@ -56,13 +56,9 @@ func noCache(h http.Handler) http.Handler {
 	})
 }
 
-var immutableFiles = regexp.MustCompile(`\.[0-9a-fA-F]{8,}\.(css|js)$`)
-
 func cacheImmutable(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		if immutableFiles.MatchString(req.URL.Path) {
-			rw.Header().Set("Cache-Control", "max-age=2592000, public, immutable")
-		}
+		rw.Header().Set("Cache-Control", "max-age=2592000, public, immutable")
 		h.ServeHTTP(rw, req)
 	})
 }
