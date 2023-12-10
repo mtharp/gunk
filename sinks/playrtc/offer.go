@@ -10,7 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type ViewerFunc func(int)
+type ViewerFunc func() func()
 type CandidateSender func(webrtc.ICECandidateInit)
 
 func OfferToSend(ctx context.Context, e *rtcengine.Engine, src av.Demuxer, addViewer ViewerFunc, sendCandidate CandidateSender) (*Sender, error) {

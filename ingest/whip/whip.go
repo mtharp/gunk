@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"eaglesong.dev/gunk/internal"
@@ -34,7 +33,6 @@ const (
 type Receiver struct {
 	pc     *webrtc.PeerConnection
 	stats  stats.Getter
-	state  uintptr
 	ctx    context.Context
 	cancel context.CancelFunc
 	log    *zerolog.Logger
@@ -62,7 +60,6 @@ func (r *Receiver) start(offer []byte, dest *pubsub.Queue) error {
 	// setup callbacks
 	gatherWait, gatherDone := context.WithCancel(context.Background())
 	r.pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
-		atomic.StoreUintptr(&r.state, uintptr(state))
 		r.log.Info().Stringer("rtc_state", state).Send()
 		switch state {
 		case webrtc.ICEConnectionStateDisconnected, webrtc.ICEConnectionStateFailed, webrtc.ICEConnectionStateClosed:

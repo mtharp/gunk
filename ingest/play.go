@@ -6,11 +6,11 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"sync/atomic"
 
 	"eaglesong.dev/gunk/model"
 	"eaglesong.dev/gunk/sinks/playrtc"
 	"eaglesong.dev/hls"
+	"eaglesong.dev/hls/mp4mux"
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/format/ts"
 	"github.com/rs/zerolog"
@@ -24,26 +24,26 @@ func (m *Manager) ServeTS(rw http.ResponseWriter, req *http.Request, name string
 	if src == nil {
 		return ErrNoChannel
 	}
+	rw.Header().Set("Cache-Control", "max-age=0, no-cache, no-store")
 	rw.Header().Set("Content-Type", "video/MP2T")
 	rw.Header().Set("Transfer-Encoding", "chunked")
 	muxer := ts.NewMuxer(rw)
-	streams, _ := src.Streams()
-	muxer.WriteHeader(streams)
-	ch.addViewer(1)
-	defer ch.addViewer(-1)
+	defer ch.addViewer()()
 	return copyStream(req.Context(), muxer, src)
 }
 
 func (m *Manager) ServeMP4(rw http.ResponseWriter, req *http.Request, name string) error {
 	ch := m.channel(name)
-	p := ch.getWeb()
-	if p == nil {
+	src := ch.queue(false)
+	if src == nil {
 		return ErrNoChannel
 	}
-	ch.addViewer(1)
-	defer ch.addViewer(-1)
-	p.Tail(rw, req)
-	return nil
+	rw.Header().Set("Cache-Control", "max-age=0, no-cache, no-store")
+	rw.Header().Set("Content-Type", "video/mp4")
+	rw.Header().Set("Transfer-Encoding", "chunked")
+	muxer := mp4mux.New(rw)
+	defer ch.addViewer()()
+	return copyStream(req.Context(), muxer, src)
 }
 
 func (m *Manager) ServeWeb(rw http.ResponseWriter, req *http.Request, name string) error {
@@ -78,10 +78,9 @@ func (m *Manager) OfferSDP(ctx context.Context, name string, sendCandidate playr
 	if src == nil {
 		return nil, ErrNoChannel
 	}
-	addViewer := func(delta int) { ch.addViewer(int32(delta)) }
 	l := zerolog.Ctx(ctx).With().Str("channel", name).Logger()
 	ctx = l.WithContext(ctx)
-	return playrtc.OfferToSend(ctx, m.rtc, src, addViewer, sendCandidate)
+	return playrtc.OfferToSend(ctx, m.rtc, src, ch.addViewer, sendCandidate)
 }
 
 func (m *Manager) PopulateLive(infos []*model.ChannelInfo) {
@@ -105,15 +104,22 @@ func (m *Manager) PopulateLive(infos []*model.ChannelInfo) {
 			info.WebURL = ch.getWeb().MPD()
 		}
 		info.NativeURL = ch.getWeb().Playlist()
-		info.RTC = atomic.LoadUintptr(&ch.rtc) != 0
+		info.RTC = ch.rtc.Load()
 	}
 }
 
 func copyStream(ctx context.Context, dest av.Muxer, src av.Demuxer) error {
+	streams, err := src.Streams()
+	if err != nil {
+		return err
+	}
+	if err := dest.WriteHeader(streams); err != nil {
+		return err
+	}
 	for ctx.Err() == nil {
 		pkt, err := src.ReadPacket()
-		if err == io.EOF || ctx.Err() != nil {
-			return nil
+		if err == io.EOF {
+			break
 		} else if err != nil {
 			return err
 		}
@@ -121,5 +127,5 @@ func copyStream(ctx context.Context, dest av.Muxer, src av.Demuxer) error {
 			return err
 		}
 	}
-	return nil
+	return dest.WriteTrailer()
 }

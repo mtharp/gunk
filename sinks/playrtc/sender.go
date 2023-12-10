@@ -16,7 +16,7 @@ import (
 type Sender struct {
 	pc     *webrtc.PeerConnection
 	stats  stats.Getter
-	state  uintptr
+	state  atomic.Uintptr
 	src    av.Demuxer
 	tracks []*senderTrack
 	sdp    webrtc.SessionDescription
@@ -35,7 +35,7 @@ func (s *Sender) start(streams []av.CodecData) error {
 				s.lastIP.Store(ip)
 			}
 		}
-		atomic.StoreUintptr(&s.state, uintptr(state))
+		s.state.Store(uintptr(state))
 		s.log.Info().Stringer("rtc_state", state).Send()
 	})
 	s.pc.OnICECandidate(func(candidate *webrtc.ICECandidate) {
@@ -101,12 +101,11 @@ func (s *Sender) serve() {
 }
 
 func (s *Sender) getState() webrtc.ICEConnectionState {
-	return webrtc.ICEConnectionState(atomic.LoadUintptr(&s.state))
+	return webrtc.ICEConnectionState(s.state.Load())
 }
 
 func (s *Sender) serveOnce() error {
-	s.addViewer(1)
-	defer s.addViewer(-1)
+	defer s.addViewer()()
 	defer s.Close()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

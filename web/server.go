@@ -52,9 +52,9 @@ func (s *Server) Handler() http.Handler {
 	s.router = r
 	r.HandleFunc("/ws", s.serveWS)
 	// video
-	r.HandleFunc("/live/{channel}.ts", corsOK(s.viewPlayTS)).Methods("GET", "OPTIONS").Name("live")
+	r.HandleFunc("/live/{channel}.ts", corsOK(s.viewPlayTS)).Methods("GET", "OPTIONS")
 	r.HandleFunc("/live/{channel}.ts", s.viewPublishTS).Methods("PUT", "POST")
-	r.HandleFunc("/live/{channel}.mp4", corsOK(s.viewPlayMP4)).Methods("GET", "OPTIONS")
+	r.HandleFunc("/live/{channel}.mp4", corsOK(s.viewPlayMP4)).Methods("GET", "OPTIONS").Name("live")
 	r.HandleFunc("/rtc/{channel}", s.viewPublishRTC).Methods("POST")
 	r.HandleFunc("/rtc/{channel}/{id}", s.viewDeleteRTC).Methods("DELETE").Name("rtc_id")
 	r.HandleFunc("/live/{channel}.m3u8", corsOK(s.viewPlaylist)).Methods("GET", "HEAD", "OPTIONS")

@@ -3,7 +3,6 @@ package ingest
 import (
 	"context"
 	"errors"
-	"sync/atomic"
 
 	"eaglesong.dev/gunk/ingest/whip"
 	"eaglesong.dev/gunk/internal"
@@ -73,11 +72,7 @@ func (m *Manager) PublishRTC(auth model.ChannelAuth, offer []byte) ([]byte, stri
 			if m.PublishEvent != nil {
 				m.PublishEvent(auth, true, thumb)
 			}
-			if thumb.HasBframes {
-				atomic.StoreUintptr(&ch.rtc, 0)
-			} else {
-				atomic.StoreUintptr(&ch.rtc, 1)
-			}
+			ch.rtc.Store(!thumb.HasBframes)
 		}
 		// return nil
 	}()

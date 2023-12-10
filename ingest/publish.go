@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"sync/atomic"
 	"time"
 
 	"eaglesong.dev/gunk/internal"
@@ -92,11 +91,7 @@ func (m *Manager) Publish(ctx context.Context, auth model.ChannelAuth, src av.De
 			if m.PublishEvent != nil {
 				m.PublishEvent(auth, true, thumb)
 			}
-			if thumb.HasBframes {
-				atomic.StoreUintptr(&ch.rtc, 0)
-			} else {
-				atomic.StoreUintptr(&ch.rtc, 1)
-			}
+			ch.rtc.Store(!thumb.HasBframes)
 		}
 		return nil
 	})
@@ -125,11 +120,12 @@ func (ch *channel) setStream(q, aacq, opusq *pubsub.Queue, workDir string, mode 
 		ch.web.Close()
 	}
 	ch.web = &hls.Publisher{
-		WorkDir: workDir,
-		Mode:    mode,
+		WorkDir:  workDir,
+		Mode:     mode,
+		BlockMPD: true,
 	}
 	ch.stoppedAt = time.Time{}
-	atomic.StoreUintptr(&ch.live, uintptr(statePending))
+	ch.setLive(statePending)
 	return ch.web
 }
 
@@ -139,7 +135,7 @@ func (ch *channel) stopStream(q *pubsub.Queue) bool {
 	if ch.ingest != q {
 		return false
 	}
-	atomic.StoreUintptr(&ch.live, uintptr(stateOffline))
+	ch.setLive(stateOffline)
 	ch.ingest = nil
 	ch.aac = nil
 	ch.opus = nil
@@ -191,7 +187,7 @@ func (ch *channel) copyWeb(dest av.Muxer, src av.Demuxer) error {
 			ev := log.Info().Str("channel", ch.name)
 			if needKeys == 0 {
 				ev.Msgf("going live")
-				atomic.StoreUintptr(&ch.live, uintptr(stateLive))
+				ch.setLive(stateLive)
 			} else {
 				ev.Msgf("live in %d", needKeys)
 			}

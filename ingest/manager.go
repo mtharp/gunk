@@ -52,10 +52,11 @@ type channel struct {
 	stoppedAt time.Time
 	name      string
 
-	live, rtc uintptr
-	viewers   int32 // excluding web
+	live      atomic.Uintptr
+	rtc       atomic.Bool
+	viewers   atomic.Int32 // excluding web
+	webvTotal atomic.Int32
 	webv      sync.Map
-	webvTotal int32
 }
 
 func (m *Manager) channel(name string) *channel {
@@ -96,14 +97,23 @@ func (ch *channel) isLive() liveState {
 	if ch == nil {
 		return stateOffline
 	}
-	return liveState(atomic.LoadUintptr(&ch.live))
+	return liveState(ch.live.Load())
 }
 
-func (ch *channel) addViewer(delta int32) {
-	if ch == nil {
-		return
+func (ch *channel) setLive(state liveState) {
+	if ch != nil {
+		ch.live.Store(uintptr(state))
 	}
-	atomic.AddInt32(&ch.viewers, delta)
+}
+
+func (ch *channel) addViewer() func() {
+	if ch == nil {
+		return func() {}
+	}
+	ch.viewers.Add(1)
+	return func() {
+		ch.viewers.Add(-1)
+	}
 }
 
 func (ch *channel) webViewed(host string) {
@@ -121,7 +131,7 @@ func (ch *channel) countWebViewers() {
 		}
 		return true
 	})
-	atomic.StoreInt32(&ch.webvTotal, views)
+	ch.webvTotal.Store(views)
 }
 
 func (ch *channel) getWeb() *hls.Publisher {
@@ -135,7 +145,5 @@ func (ch *channel) getWeb() *hls.Publisher {
 }
 
 func (ch *channel) currentViewers() int {
-	v := int(atomic.LoadInt32(&ch.viewers))
-	v += int(atomic.LoadInt32(&ch.webvTotal))
-	return v
+	return int(ch.viewers.Load() + ch.webvTotal.Load())
 }
