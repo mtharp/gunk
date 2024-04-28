@@ -5,7 +5,7 @@ import (
 
 	"eaglesong.dev/gunk/internal/rtcengine"
 	"github.com/nareix/joy4/av"
-	"github.com/pion/webrtc/v3"
+	"github.com/pion/webrtc/v4"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )

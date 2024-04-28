@@ -9,11 +9,12 @@ import (
 	"eaglesong.dev/gunk/h264util"
 	"eaglesong.dev/gunk/internal"
 	"github.com/nareix/joy4/av"
+	"github.com/nareix/joy4/codec/av1parser"
 	"github.com/nareix/joy4/codec/h264parser"
 	"github.com/nareix/joy4/codec/opusparser"
 	"github.com/pion/rtp"
 	"github.com/pion/rtp/codecs"
-	"github.com/pion/webrtc/v3"
+	"github.com/pion/webrtc/v4"
 )
 
 type senderTrack struct {
@@ -40,10 +41,21 @@ func newSenderTrack(cd av.CodecData) (*senderTrack, error) {
 	case h264parser.CodecData:
 		s.payloader = &codecs.H264Payloader{}
 		s.h264 = &cd
+		levelID := fmt.Sprintf("%02x%02x%02x",
+			cd.RecordInfo.AVCProfileIndication,
+			cd.RecordInfo.ProfileCompatibility,
+			cd.RecordInfo.AVCLevelIndication)
 		capability = webrtc.RTPCodecCapability{
 			MimeType:    webrtc.MimeTypeH264,
 			ClockRate:   90000,
-			SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f",
+			SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=" + levelID,
+		}
+	case av1parser.CodecData:
+		s.payloader = &codecs.AV1Payloader{}
+		capability = webrtc.RTPCodecCapability{
+			MimeType:  webrtc.MimeTypeAV1,
+			ClockRate: 90000,
+			// TODO fmtp
 		}
 	case *opusparser.CodecData:
 		s.payloader = &codecs.OpusPayloader{}

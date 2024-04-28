@@ -3,7 +3,6 @@ package grabber
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os/exec"
@@ -12,7 +11,9 @@ import (
 	"eaglesong.dev/gunk/h264util"
 	"eaglesong.dev/gunk/model"
 	"github.com/nareix/joy4/av"
+	"github.com/nareix/joy4/codec/av1parser"
 	"github.com/nareix/joy4/codec/h264parser"
+	"github.com/nareix/joy4/codec/h265parser"
 	"github.com/rs/zerolog/log"
 )
 
@@ -31,16 +32,58 @@ func Grab(channelName string, dm av.Demuxer) (<-chan Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	vidIdx := -1
-	var vidCodec h264parser.CodecData
+	var pushKeyframe func(*bytes.Buffer, av.Packet)
+	var makeFrame func(context.Context, *bytes.Buffer) ([]byte, error)
+	hasBframes := func(av.Packet) bool { return false }
+	var vidIdx int8 = -1
 	for i, s := range streams {
-		if s.Type() == av.H264 {
-			vidIdx = i
-			vidCodec = s.(h264parser.CodecData)
+		if !s.Type().IsVideo() {
+			continue
+		}
+		vidIdx = int8(i)
+		switch cd := s.(type) {
+		case h264parser.CodecData:
+			pushKeyframe = func(buf *bytes.Buffer, pkt av.Packet) {
+				h264util.WriteAnnexBPacket(buf, pkt, cd)
+			}
+			makeFrame = func(ctx context.Context, b *bytes.Buffer) ([]byte, error) {
+				return ffmpegThumbnail(ctx, cd, b.Bytes(), "h264")
+			}
+			hasBframes = func(pkt av.Packet) bool {
+				nalus, _ := h264parser.SplitNALUs(pkt.Data)
+				for _, nalu := range nalus {
+					if !h264parser.IsDataNALU(nalu) {
+						continue
+					}
+					if sliceType, _ := h264parser.ParseSliceHeaderFromNALU(nalu); sliceType == h264parser.SLICE_B {
+						return true
+					}
+				}
+				return false
+			}
+		case h265parser.CodecData:
+			pushKeyframe = func(buf *bytes.Buffer, pkt av.Packet) {
+				h265parser.WriteAnnexBPacket(buf, pkt, cd)
+			}
+			makeFrame = func(ctx context.Context, b *bytes.Buffer) ([]byte, error) {
+				return ffmpegThumbnail(ctx, cd, b.Bytes(), "hevc")
+			}
+		case av1parser.CodecData:
+			pushKeyframe = func(b *bytes.Buffer, p av.Packet) {
+				// TODO - is reformatting needed?
+				b.Write(av1parser.TemporalDelimiter)
+				b.Write(cd.ConfigOBUs)
+				b.Write(p.Data)
+			}
+			makeFrame = func(ctx context.Context, b *bytes.Buffer) ([]byte, error) {
+				return ffmpegThumbnail(ctx, cd, b.Bytes(), "obu")
+			}
+		default:
+			return nil, fmt.Errorf("grabber: unsupported video codec %s", s.Type().String())
 		}
 	}
 	if vidIdx < 0 {
-		return nil, errors.New("no h264 stream found")
+		return nil, fmt.Errorf("no video found")
 	}
 	grabch := make(chan Result, 1)
 	go func() {
@@ -58,38 +101,43 @@ func Grab(channelName string, dm av.Demuxer) (<-chan Result, error) {
 				l.Err(err).Msg("failed to grab frame")
 				return
 			}
-			if int(pkt.Idx) != vidIdx {
+			if pkt.Idx != vidIdx {
 				continue
 			}
 			if buf.Len() != 0 && (!pkt.IsKeyFrame || pkt.Time != keyTime) {
 				if time.Since(lastGrab) >= grabInterval {
-					if err := makeFrame(channelName, vidCodec, buf.Bytes()); err != nil {
-						l.Err(err).Msg("failed to make thumbnail")
+					ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+					jpegBytes, err := makeFrame(ctx, &buf)
+					if err == nil {
+						err = model.PutThumb(ctx, channelName, jpegBytes)
 					}
-					lastGrab = time.Now()
-					select {
-					case grabch <- Result{
-						Time:       lastGrab,
-						HasBframes: lastBframe != 0,
-					}:
-					default:
+					cancel()
+					if err != nil {
+						l.Err(err).Msg("failed to make thumbnail")
+					} else {
+						lastGrab = time.Now()
+						select {
+						case grabch <- Result{
+							Time:       lastGrab,
+							HasBframes: lastBframe != 0,
+						}:
+						default:
+						}
 					}
 				}
 				buf.Reset()
 			}
 			if pkt.IsKeyFrame {
-				h264util.WriteAnnexBPacket(&buf, pkt, vidCodec)
+				if buf.Len() != 0 {
+					// don't push parameter sets more than once
+					pkt.IsKeyFrame = false
+				}
+				pushKeyframe(&buf, pkt)
 				keyTime = pkt.Time
 			} else {
 				// check for bframes
-				nalus, _ := h264parser.SplitNALUs(pkt.Data)
-				for _, nalu := range nalus {
-					if !h264parser.IsDataNALU(nalu) {
-						continue
-					}
-					if sliceType, _ := h264parser.ParseSliceHeaderFromNALU(nalu); sliceType == h264parser.SLICE_B {
-						lastBframe = pkt.Time
-					}
+				if hasBframes(pkt) {
+					lastBframe = pkt.Time
 				}
 				if lastBframe != 0 && (pkt.Time-lastBframe) > 30*time.Second {
 					lastBframe = 0
@@ -100,15 +148,13 @@ func Grab(channelName string, dm av.Demuxer) (<-chan Result, error) {
 	return grabch, nil
 }
 
-func makeFrame(channelName string, cd h264parser.CodecData, raw []byte) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+func ffmpegThumbnail(ctx context.Context, cd av.VideoCodecData, raw []byte, format string) ([]byte, error) {
 	height := targetWidth * cd.Height() / cd.Width()
 	var jpeg bytes.Buffer
 	var errmsg bytes.Buffer
 	cmd := exec.CommandContext(ctx, "ffmpeg",
 		"-loglevel", "warning",
-		"-f", "h264",
+		"-f", format,
 		"-i", "-",
 		"-frames:v", "1",
 		"-s", fmt.Sprintf("%dx%d", targetWidth, height),
@@ -117,7 +163,7 @@ func makeFrame(channelName string, cd h264parser.CodecData, raw []byte) error {
 	cmd.Stdout = &jpeg
 	cmd.Stderr = &errmsg
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%s\n%s", err.Error(), errmsg.String())
+		return nil, fmt.Errorf("%s\n%s", err.Error(), errmsg.String())
 	}
-	return model.PutThumb(ctx, channelName, jpeg.Bytes())
+	return jpeg.Bytes(), nil
 }

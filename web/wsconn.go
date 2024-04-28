@@ -11,7 +11,7 @@ import (
 
 	"eaglesong.dev/gunk/model"
 	"github.com/gorilla/websocket"
-	"github.com/pion/webrtc/v3"
+	"github.com/pion/webrtc/v4"
 	"github.com/rs/zerolog/hlog"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"

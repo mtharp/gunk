@@ -5,7 +5,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/pion/webrtc/v3"
+	"github.com/pion/webrtc/v4"
 )
 
 func (n *wsSession) Play(ctx context.Context, name string) error {

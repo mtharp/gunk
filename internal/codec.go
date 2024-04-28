@@ -4,6 +4,7 @@ import (
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/codec/aacparser"
 	"github.com/nareix/joy4/codec/h264parser"
+	"github.com/nareix/joy4/codec/h265parser"
 	"github.com/rs/zerolog"
 )
 
@@ -25,6 +26,11 @@ func CodecTag(cd av.CodecData, e *zerolog.Event) {
 			cd.RecordInfo.AVCLevelIndication})
 		e.Hex("avc1_pps", cd.PPS())
 		e.Hex("avc1_sps", cd.SPS())
+	case h265parser.CodecData:
+		e.Str("hvc1_tag", cd.MimeTag())
+		e.Hex("hvc1_vps", cd.RecordInfo.VPS[0])
+		e.Hex("hvc1_sps", cd.RecordInfo.SPS[0])
+		e.Hex("hvc1_pps", cd.RecordInfo.PPS[0])
 	case aacparser.CodecData:
 		e.Hex("aac_conf", cd.MPEG4AudioConfigBytes())
 	}

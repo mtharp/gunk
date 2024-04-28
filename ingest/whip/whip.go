@@ -11,12 +11,12 @@ import (
 	"eaglesong.dev/gunk/internal/rtcengine"
 	"github.com/nareix/joy4/av"
 	"github.com/nareix/joy4/av/pubsub"
+	"github.com/nareix/joy4/codec/av1parser"
 	"github.com/nareix/joy4/codec/opusparser"
 	"github.com/pion/interceptor/pkg/stats"
-	"github.com/pion/rtp"
 	"github.com/pion/rtp/codecs"
-	"github.com/pion/webrtc/v3"
-	"github.com/pion/webrtc/v3/pkg/media/samplebuilder"
+	"github.com/pion/webrtc/v4"
+	"github.com/pion/webrtc/v4/pkg/media/samplebuilder"
 	"github.com/rs/zerolog"
 )
 
@@ -25,10 +25,7 @@ const (
 	audioIdx
 )
 
-const (
-	maxLateSeq  = 1000
-	maxLateTime = 5 * time.Second
-)
+const maxLateSeq = 256
 
 type Receiver struct {
 	pc     *webrtc.PeerConnection
@@ -58,7 +55,7 @@ func Receive(ctx context.Context, e *rtcengine.Engine, offer []byte, dest *pubsu
 func (r *Receiver) start(offer []byte, dest *pubsub.Queue) error {
 	r.log.Debug().Str("rtc_offer_received", string(offer)).Send()
 	// setup callbacks
-	gatherWait, gatherDone := context.WithCancel(context.Background())
+	gatherDone := webrtc.GatheringCompletePromise(r.pc)
 	r.pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
 		r.log.Info().Stringer("rtc_state", state).Send()
 		switch state {
@@ -67,12 +64,8 @@ func (r *Receiver) start(offer []byte, dest *pubsub.Queue) error {
 			dest.Close()
 		}
 	})
-	r.pc.OnICEGatheringStateChange(func(state webrtc.ICEGathererState) {
+	r.pc.OnICEGatheringStateChange(func(state webrtc.ICEGatheringState) {
 		r.log.Info().Stringer("ice_state", state).Send()
-		if state == webrtc.ICEGathererStateComplete {
-			// release the SDP answer when all candidates are ready
-			gatherDone()
-		}
 	})
 	codecDatas := r.startGatheringHeaders(dest)
 	r.pc.OnTrack(func(tr *webrtc.TrackRemote, _ *webrtc.RTPReceiver) {
@@ -81,6 +74,8 @@ func (r *Receiver) start(offer []byte, dest *pubsub.Queue) error {
 			r.startOpusTrack(tr, dest, codecDatas[audioIdx])
 		case strings.ToLower(webrtc.MimeTypeH264):
 			r.startH264Track(tr, dest, codecDatas[videoIdx])
+		case strings.ToLower(webrtc.MimeTypeAV1):
+			r.startAV1Track(tr, dest, codecDatas[videoIdx])
 		default:
 			r.log.Error().Msgf("unsupported codec type %s", tr.Codec().MimeType)
 			return
@@ -107,7 +102,7 @@ func (r *Receiver) start(offer []byte, dest *pubsub.Queue) error {
 	case <-r.ctx.Done():
 		r.Close()
 		return r.ctx.Err()
-	case <-gatherWait.Done():
+	case <-gatherDone:
 	}
 	finalAnswer := r.pc.LocalDescription()
 	if finalAnswer == nil {
@@ -132,9 +127,10 @@ func (r *Receiver) Close() {
 	r.pc.Close()
 }
 
-func (r *Receiver) receiveTrack(tr *webrtc.TrackRemote, dest av.PacketWriter, idx int8, depacketizer rtp.Depacketizer, sampler sampler) error {
+func (r *Receiver) receiveTrack(tr *webrtc.TrackRemote, dest av.PacketWriter, idx int8, parser sampleParser) error {
 	var lastKey time.Duration
-	builder := samplebuilder.New(maxLateSeq, depacketizer, tr.Codec().ClockRate, samplebuilder.WithMaxTimeDelay(maxLateTime))
+	builder := samplebuilder.New(maxLateSeq, parser, tr.Codec().ClockRate,
+		samplebuilder.WithPacketHeadHandler(parser.OnPacketHead))
 	timescale := internal.RelativeConverter{Rate: uint64(tr.Codec().ClockRate)}
 	for {
 		pkt, _, err := tr.ReadRTP()
@@ -152,11 +148,8 @@ func (r *Receiver) receiveTrack(tr *webrtc.TrackRemote, dest av.PacketWriter, id
 				Time: timescale.Convert(sample.PacketTimestamp),
 				Data: sample.Data,
 			}
-			if sampler != nil {
-				if err := sampler.Update(&pkt); err != nil {
-					return err
-				}
-			}
+			meta := sample.Metadata.(packetMeta)
+			meta.Update(&pkt)
 			// Avoid back-to-back IDR slices both reporting as keyframes
 			if pkt.Time == lastKey {
 				pkt.IsKeyFrame = false
@@ -209,7 +202,7 @@ func (r *Receiver) startOpusTrack(tr *webrtc.TrackRemote, dest av.PacketWriter, 
 	}
 	go r.trackStats(tr)
 	go func() {
-		if err := r.receiveTrack(tr, dest, audioIdx, &codecs.OpusPacket{}, nil); err != nil {
+		if err := r.receiveTrack(tr, dest, audioIdx, audioParser{&codecs.OpusPacket{}}); err != nil {
 			r.log.Err(err).Msg("opus track terminated")
 		}
 	}()
@@ -218,10 +211,18 @@ func (r *Receiver) startOpusTrack(tr *webrtc.TrackRemote, dest av.PacketWriter, 
 func (r *Receiver) startH264Track(tr *webrtc.TrackRemote, dest av.PacketWriter, codecData chan<- av.CodecData) {
 	go r.trackStats(tr)
 	go func() {
-		dpkt := &codecs.H264Packet{IsAVC: true} // convert to AVCC
-		sampler := &h264sampler{cd: codecData}
-		if err := r.receiveTrack(tr, dest, videoIdx, dpkt, sampler); err != nil {
+		if err := r.receiveTrack(tr, dest, videoIdx, newH264Parser(codecData)); err != nil {
 			r.log.Err(err).Msg("h264 track terminated")
+		}
+	}()
+}
+
+func (r *Receiver) startAV1Track(tr *webrtc.TrackRemote, dest av.PacketWriter, codecData chan<- av.CodecData) {
+	codecData <- av1parser.CodecData{}
+	go r.trackStats(tr)
+	go func() {
+		if err := r.receiveTrack(tr, dest, videoIdx, newAV1Parser()); err != nil {
+			r.log.Err(err).Msg("av1 track terminated")
 		}
 	}()
 }
