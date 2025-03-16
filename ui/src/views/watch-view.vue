@@ -17,9 +17,7 @@
       :src="chInfo.thumb"
       class="player-thumb"
     />
-    <div v-if="!chInfo.live" class="player-shade">
-      {{ chInfo.pending ? "GOING LIVE" : "OFFLINE" }}
-    </div>
+    <div v-if="!chInfo.live" class="player-shade">OFFLINE</div>
   </div>
 </template>
 
@@ -46,5 +44,7 @@ const chInfo = computed((): ChannelInfo => {
   }
   return nullChannelInfo();
 });
-const rtcActive = computed(() => preferences.useRTC && chInfo.value.rtc);
+const rtcActive = computed(
+  () => preferences.useRTC && chInfo.value.whep_url != "",
+);
 </script>

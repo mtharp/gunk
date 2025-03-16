@@ -36,7 +36,7 @@ export default defineComponent({
   data() {
     return {
       now: new Date().getTime(),
-      interval: null as number | null,
+      interval: null as NodeJS.Timeout | null,
     };
   },
   computed: {

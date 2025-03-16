@@ -2,13 +2,14 @@
   <div class="container mt-3">
     <div class="bg-white">
       <h1>My Channels</h1>
+      <b-alert :model-value="state.alert != ''" variant="danger">{{
+        state.alert
+      }}</b-alert>
       <b-form @submit.prevent="doCreate">
         <b-form-group label="Channel Name">
           <b-form-input v-model="state.newName" required class="mt-1" />
         </b-form-group>
-        <b-alert :show="state.alert != ''" variant="danger">{{
-          state.alert
-        }}</b-alert>
+
         <b-button type="submit" variant="primary" class="mt-3">Create</b-button>
       </b-form>
       <b-list-group class="mt-5">
@@ -31,7 +32,7 @@
             >Delete</b-button
           >
           <b-button class="m-2" size="sm" @click="doShow(def)"
-            >Show Key</b-button
+            >Configure</b-button
           >
         </b-list-group-item>
       </b-list-group>
@@ -59,17 +60,19 @@
       <h4>OBS Stream Settings</h4>
       <b-card no-body>
         <b-tabs card>
-          <b-tab title="Standard">
+          <b-tab title="WHIP (preferred)">
             <b-card-text>
               <b-form v-if="state.selected">
-                <b-form-group label="Server (custom service)">
-                  <b-form-input readonly :value="state.selected.rtmp_dir" />
+                <p>WHIP requires OBS 30.0.0 or later.</p>
+                <p>Service: <strong>WHIP</strong></p>
+                <b-form-group label="Server">
+                  <b-form-input readonly :value="state.selected.whip_url" />
                 </b-form-group>
-                <b-form-group label="Stream Key">
+                <b-form-group label="Bearer Token" class="mt-3">
                   <b-form-input
                     v-show="state.revealKey"
                     readonly
-                    :value="state.selected.rtmp_base"
+                    :value="state.selected.key"
                   />
                   <b-button
                     v-show="!state.revealKey"
@@ -80,17 +83,19 @@
               </b-form>
             </b-card-text>
           </b-tab>
-          <b-tab title="WHIP (beta)">
+
+          <b-tab title="RTMP (legacy)">
             <b-card-text>
               <b-form v-if="state.selected">
-                <b-form-group label="Server (WHIP service)">
-                  <b-form-input readonly :value="state.selected.whip_url" />
+                <p>Service: <strong>Custom...</strong></p>
+                <b-form-group label="Server">
+                  <b-form-input readonly :value="state.selected.rtmp_dir" />
                 </b-form-group>
-                <b-form-group label="Bearer Token">
+                <b-form-group label="Stream Key" class="mt-3">
                   <b-form-input
                     v-show="state.revealKey"
                     readonly
-                    :value="state.selected.key"
+                    :value="state.selected.rtmp_base"
                   />
                   <b-button
                     v-show="!state.revealKey"
@@ -111,7 +116,7 @@
               <ul>
                 <li>Output Mode: Advanced</li>
                 <li>Keyframe Interval: 5 seconds</li>
-                <li>Preset: Quality</li>
+                <li>Preset: Low Latency</li>
                 <li>Profile: high</li>
                 <li><strong>Max B-frames: 0</strong></li>
               </ul>
@@ -124,7 +129,7 @@
                 <li>Keyframe Interval: 5 seconds</li>
                 <li>Preset: veryfast</li>
                 <li>Profile: high</li>
-                <li>Tune: (none)</li>
+                <li>Tune: lowlatency</li>
                 <li><strong>x264 options: bframes=0</strong></li>
               </ul>
             </b-card-text>

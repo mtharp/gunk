@@ -23,7 +23,7 @@
               ><b-icon-pencil-fill
             /></router-link>
           </li>
-          <li class="nav-item ml-2">
+          <!-- <li class="nav-item ml-2">
             <b-avatar
               v-for="name in channels.live"
               button
@@ -36,7 +36,7 @@
               v-b-tooltip.hover
               :title="'Watch ' + name"
             ></b-avatar>
-          </li>
+          </li> -->
         </ul>
         <ul class="navbar-nav ml-auto">
           <li class="nav-item" v-if="!loggedIn">
@@ -79,8 +79,7 @@ import { useChannelsStore } from "./stores/channels";
 import { useControlsHider } from "./stores/controls-hider";
 import { usePreferences } from "./stores/preferences";
 import { useUserInfoStore } from "./stores/userinfo";
-import router from "./router";
-import ws from "./ws";
+// import router from "./router";
 
 const userinfo = useUserInfoStore();
 const channels = useChannelsStore();
@@ -90,22 +89,21 @@ const siteName = import.meta.env.VITE_APP_TITLE;
 
 const loggedIn = computed(() => !!userinfo.id);
 
-function thumb(name: string) {
-  return channels.channels[name].thumb;
-}
+// function thumb(name: string) {
+//   return channels.channels[name].thumb;
+// }
 
-function pushChannel(name: string) {
-  const route = { name: "watch", params: { channel: name } };
-  router.push(route);
-}
+// function pushChannel(name: string) {
+//   const route = { name: "watch", params: { channel: name } };
+//   router.push(route);
+// }
 
 onMounted(() => {
   preferences.fromLocalStorage();
   channels.refreshChannels();
+  window.setInterval(() => channels.refreshChannels(), 10000);
   userinfo.refreshUserInfo();
   window.setInterval(() => userinfo.refreshUserInfo(), 300000);
-  ws.onChannel = (ch) => channels.putChannel(ch);
-  ws.open();
 });
 </script>
 

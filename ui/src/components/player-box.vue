@@ -123,7 +123,7 @@
           </template>
           <!-- for some reason chrome won't open a .m3u8 file directly so don't show the playlist link -->
           <b-dropdown-item
-            :href="playlistURL"
+            :href="ch.live_url"
             @click="video!.pause()"
             v-if="!isWebKit"
           >
@@ -135,7 +135,8 @@
           </b-dropdown-item>
           <b-dropdown-divider />
           <div class="ps-3">
-            <b-form-checkbox v-model="preferences.useRTC" :disabled="!ch.rtc"
+            <!-- :disabled="!ch.rtc" -->
+            <b-form-checkbox v-model="preferences.useRTC"
               >Use WebRTC</b-form-checkbox
             >
             <b-form-checkbox v-model="preferences.lowLatency"
@@ -159,8 +160,7 @@
 </template>
 
 <script setup lang="ts">
-import VueSlider from "vue-slider-component";
-import "vue-slider-component/theme/antd.css";
+import VueSlider from "vue-3-slider-component";
 
 import {
   computed,

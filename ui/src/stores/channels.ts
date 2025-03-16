@@ -4,28 +4,24 @@ import axios from "axios";
 export interface ChannelInfo {
   name: string;
   live: boolean;
-  pending: boolean;
   last: number;
   thumb: string;
+  hls_url: string;
   live_url: string;
-  web_url: string;
-  native_url: string;
+  whep_url: string;
   viewers: number;
-  rtc: boolean;
 }
 
 export function nullChannelInfo(): ChannelInfo {
   return {
     name: "",
     live: false,
-    pending: false,
     last: 0,
     thumb: "",
+    hls_url: "",
     live_url: "",
-    web_url: "",
-    native_url: "",
+    whep_url: "",
     viewers: 0,
-    rtc: false,
   };
 }
 

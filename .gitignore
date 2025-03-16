@@ -1,6 +1,5 @@
 *.log
 .env.local
 .vscode
-/hls
-/joy4
 go.work*
+_*

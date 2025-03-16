@@ -14,7 +14,7 @@ export class HLSPlayer {
     this.video = video;
 
     const conf: Partial<HlsConfig> = {
-      debug: true,
+      // debug: true,
       liveDurationInfinity: true,
       backBufferLength: 10,
       lowLatencyMode: lowLatencyMode,
@@ -23,13 +23,14 @@ export class HLSPlayer {
     if (lowLatencyMode) {
       conf.backBufferLength = 0;
       conf.liveSyncDuration = 2;
-      conf.maxLiveSyncPlaybackRate = 1.1;
+      conf.maxLiveSyncPlaybackRate = 1.25;
     } else {
       conf.liveSyncDurationCount = 2;
     }
     this.stream = new Hls(conf);
     this.stream.attachMedia(video);
     this.stream.loadSource(webURL);
+    // TODO: Error handling
     this.stream.on(Hls.Events.MANIFEST_LOADED, () => {
       if (video.oncanplay) {
         video.oncanplay(new Event(""));

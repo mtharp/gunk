@@ -41,6 +41,7 @@ export default function autoplay(video: HTMLVideoElement) {
       video.onclick = function () {
         // unmute on click
         video.muted = false;
+        video.onclick = null;
       };
       forcedMute = true;
       return video.play();
