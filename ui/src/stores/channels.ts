@@ -26,7 +26,7 @@ export function nullChannelInfo(): ChannelInfo {
 }
 
 interface ChannelState {
-  channels: { [key: string]: ChannelInfo };
+  channels: Record<string, ChannelInfo>;
   recent: string[];
 }
 
