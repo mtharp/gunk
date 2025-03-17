@@ -6,7 +6,7 @@ interface ControlsState {
   mouseMoving: number;
   mouseTimer?: number;
   tabTimer?: number;
-  targetPlayer?: HTMLVideoElement;
+  targetPlayer?: unknown;
 }
 
 export const useControlsHider = defineStore("controls-hider", {
@@ -20,7 +20,7 @@ export const useControlsHider = defineStore("controls-hider", {
   }),
   actions: {
     // called by a player when it mounts, remember its unique key
-    attachPlayer(key: any) {
+    attachPlayer(key: unknown) {
       this.targetPlayer = key;
       if (!this.configured) {
         document.addEventListener("mousemove", this.mouseMove);
@@ -31,7 +31,7 @@ export const useControlsHider = defineStore("controls-hider", {
     },
     // when a player unmounts, stop hiding controls unless a different player
     // mounted first
-    detachPlayer(key: any) {
+    detachPlayer(key: unknown) {
       if (this.targetPlayer === key) {
         this.targetPlayer = undefined;
       }

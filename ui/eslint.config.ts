@@ -7,7 +7,7 @@ import {
 } from "@vue/eslint-config-typescript";
 
 export default defineConfigWithVueTs(
-  globalIgnores(["dest/**", ".pnp*", ".yarn/**"]),
+  globalIgnores(["dist/**", ".pnp.*", ".yarn/**"]),
   pluginVue.configs["flat/essential"],
   vueTsConfigs.recommended,
   skipFormattingConfig,

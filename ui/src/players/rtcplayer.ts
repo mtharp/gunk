@@ -190,7 +190,12 @@ export default class RTCPlayer {
   destroy() {
     this.pc?.close();
     if (this.sessionUrl) {
-      axios.delete(this.sessionUrl);
+      axios.delete(this.sessionUrl).catch((err) => {
+        // ignore 404 from the session already being torn down
+        if (!axios.isAxiosError(err) || err.response?.status != 404) {
+          console.warn("failed to terminate webrtc session:", err);
+        }
+      });
     }
   }
 

@@ -5,8 +5,8 @@
       class="w-100 h-100"
       :poster="state.poster"
       @play="onPlay"
-      @pause="state.playing = false"
-      @ended="state.playing = false"
+      @pause="onPause"
+      @ended="onPause"
       @volumechange="onVolumeChange"
       @click="controlsHider.controlsTouched"
     ></video>
@@ -308,6 +308,9 @@ function onPlay() {
   if (video.value) {
     state.volume = video.value.volume;
   }
+}
+function onPause() {
+  state.playing = false;
 }
 function onVolumeChange() {
   if (video.value) {
