@@ -1,0 +1,72 @@
+https://github.com/unjs/mlly/pull/270
+
+diff --git a/dist/index.cjs b/dist/index.cjs
+index 045062e5662cdc93546533b19f24dfacb7616d67..135352e0709c42577eda17ca3cb8cb2b7f2b4ddf 100644
+--- a/dist/index.cjs
++++ b/dist/index.cjs
+@@ -2037,6 +2037,19 @@ function _tryModuleResolve(id, url, conditions) {
+     }
+   }
+ }
++function safeImportMetaResolve(path) {
++  try {
++    if (typeof undefined === "function") {
++      const resolvedPath = undefined(path);
++      if (typeof resolvedPath === "string") {
++        return resolvedPath;
++      }
++    }
++    return path;
++  } catch {
++    return path;
++  }
++}
+ function _resolve(id, options = {}) {
+   if (typeof id !== "string") {
+     if (id instanceof URL) {
+@@ -2089,6 +2102,10 @@ function _resolve(id, options = {}) {
+     if (resolved) {
+       break;
+     }
++    resolved = _tryModuleResolve(safeImportMetaResolve(id), url, conditionsSet);
++    if (resolved) {
++      break;
++    }
+     for (const prefix of ["", "/index"]) {
+       for (const extension of options.extensions || DEFAULT_EXTENSIONS) {
+         resolved = _tryModuleResolve(
+diff --git a/dist/index.mjs b/dist/index.mjs
+index 721aa5aac6411ae03c9963da7e5ec80aa1730769..7b95b7e935600ab624716701e530a93b43150d38 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -2027,6 +2027,19 @@ function _tryModuleResolve(id, url, conditions) {
+     }
+   }
+ }
++function safeImportMetaResolve(path) {
++  try {
++    if (typeof import.meta.resolve === "function") {
++      const resolvedPath = import.meta.resolve(path);
++      if (typeof resolvedPath === "string") {
++        return resolvedPath;
++      }
++    }
++    return path;
++  } catch {
++    return path;
++  }
++}
+ function _resolve(id, options = {}) {
+   if (typeof id !== "string") {
+     if (id instanceof URL) {
+@@ -2079,6 +2092,10 @@ function _resolve(id, options = {}) {
+     if (resolved) {
+       break;
+     }
++    resolved = _tryModuleResolve(safeImportMetaResolve(id), url, conditionsSet);
++    if (resolved) {
++      break;
++    }
+     for (const prefix of ["", "/index"]) {
+       for (const extension of options.extensions || DEFAULT_EXTENSIONS) {
+         resolved = _tryModuleResolve(

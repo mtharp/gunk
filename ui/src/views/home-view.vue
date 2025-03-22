@@ -11,15 +11,16 @@
           <div class="channel-status">
             <span v-if="channels.channels[name].live" class="channel-live">
               LIVE
-              <b-icon-eye-fill />
+              <i-bi-eye-fill />
               {{ channels.channels[name].viewers }}
             </span>
-            <time-ago
+            <use-time-ago
               v-else
-              class="channel-notlive"
-              :since="channels.channels[name].last"
-              :auto-update="60"
-            />
+              v-slot="{ timeAgo }"
+              :time="channels.channels[name].last"
+            >
+              <span class="channel-notlive">{{ timeAgo }}</span>
+            </use-time-ago>
           </div>
         </div>
       </router-link>
@@ -29,8 +30,6 @@
 
 <script setup lang="ts">
 import { useChannelsStore } from "@/stores/channels";
-import { BIconEyeFill } from "bootstrap-icons-vue";
-import TimeAgo from "@/components/time-ago";
 
 const channels = useChannelsStore();
 

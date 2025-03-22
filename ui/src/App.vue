@@ -12,7 +12,7 @@
         <ul class="navbar-nav mr-auto flex-grow-1">
           <li class="nav-item">
             <router-link class="nav-link" to="/" title="Home"
-              ><b-icon-house-fill
+              ><i-bi-house-fill
             /></router-link>
           </li>
           <li class="nav-item" v-if="loggedIn">
@@ -20,7 +20,7 @@
               class="nav-link"
               to="/mychannels"
               title="Create a channel"
-              ><b-icon-pencil-fill
+              ><i-bi-pencil-fill
             /></router-link>
           </li>
           <!-- <li class="nav-item ml-2">
@@ -74,7 +74,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
 import { RouterView, RouterLink } from "vue-router";
-import { BIconHouseFill, BIconPencilFill } from "bootstrap-icons-vue";
 import { useChannelsStore } from "./stores/channels";
 import { useControlsHider } from "./stores/controls-hider";
 import { usePreferences } from "./stores/preferences";

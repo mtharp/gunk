@@ -20,7 +20,7 @@
           v-b-tooltip.hover
           title="Play (k)"
         >
-          <b-icon-play-fill />
+          <i-bi-play-fill />
         </button>
         <button
           @click="video!.pause()"
@@ -29,7 +29,7 @@
           v-b-tooltip.hover
           title="Pause (k)"
         >
-          <b-icon-pause-fill />
+          <i-bi-pause-fill />
         </button>
         <!-- mute and volume -->
         <div class="mute-and-vol d-flex align-items-center">
@@ -40,7 +40,7 @@
             v-b-tooltip.hover
             title="Mute (m)"
           >
-            <b-icon-volume-up-fill />
+            <i-bi-volume-up-fill />
           </button>
           <button
             @click="video!.muted = false"
@@ -49,7 +49,7 @@
             v-b-tooltip.hover
             title="Unmute (m)"
           >
-            <b-icon-volume-mute-fill />
+            <i-bi-volume-mute-fill />
           </button>
           <div :class="volumeClasses">
             <vue-slider
@@ -78,8 +78,8 @@
             v-b-tooltip.hover
             title="Current delay to live stream"
           >
-            <b-icon-skip-forward-fill v-if="state.catchingUp" />
-            <b-icon-clock-history v-else />
+            <i-bi-skip-forward-fill v-if="state.catchingUp" />
+            <i-bi-clock-history v-else />
             {{ state.latency ? state.latency.toFixed(1) + "s" : "-" }}
           </div>
           <button
@@ -89,7 +89,7 @@
             v-b-tooltip.hover
             title="Jump to the latest point in the stream (j)"
           >
-            <b-icon-lightning-fill />
+            <i-bi-lightning-fill />
             <span>LIVE</span>
           </button>
           <button
@@ -99,7 +99,7 @@
             v-b-tooltip.hover
             title="Jump to the latest point in the stream (j)"
           >
-            <b-icon-lightning />
+            <i-bi-lightning />
             <small>Skip to Live</small>
           </button>
         </template>
@@ -109,17 +109,17 @@
           v-b-tooltip.hover
           title="Real-time stream has near-zero latency"
         >
-          <b-icon-soundwave />WebRTC
+          <i-bi-soundwave />WebRTC
         </div>
         <!-- viewers -->
         <div class="controls-viewers">
-          <b-icon-eye-fill />
+          <i-bi-eye-fill />
           {{ ch.viewers }}
         </div>
         <!-- settings menu -->
         <b-dropdown dropup right no-caret>
           <template v-slot:button-content>
-            <b-icon-gear-fill />
+            <i-bi-gear-fill />
           </template>
           <!-- for some reason chrome won't open a .m3u8 file directly so don't show the playlist link -->
           <b-dropdown-item
@@ -131,7 +131,7 @@
             Watch in VLC
           </b-dropdown-item>
           <b-dropdown-item :href="ch.live_url" @click.prevent="copyVLC">
-            <b-icon-clipboard-data /> Copy VLC URL
+            <i-bi-clipboard-data /> Copy VLC URL
           </b-dropdown-item>
           <b-dropdown-divider />
           <div class="ps-3">
@@ -151,8 +151,8 @@
           v-b-tooltip.hover
           :title="state.isFullscreen ? 'Exit Fullscreen (f)' : 'Fullscreen (f)'"
         >
-          <b-icon-fullscreen v-if="!state.isFullscreen" />
-          <b-icon-fullscreen-exit v-else />
+          <i-bi-fullscreen v-if="!state.isFullscreen" />
+          <i-bi-fullscreen-exit v-else />
         </button>
       </div>
     </div>
@@ -178,22 +178,6 @@ import {
 } from "../players/provider";
 import { useControlsHider } from "@/stores/controls-hider";
 import { usePreferences } from "@/stores/preferences";
-import {
-  BIconPlayFill,
-  BIconPauseFill,
-  BIconVolumeUpFill,
-  BIconVolumeMuteFill,
-  BIconSkipForwardFill,
-  BIconClockHistory,
-  BIconLightningFill,
-  BIconLightning,
-  BIconSoundwave,
-  BIconEyeFill,
-  BIconGearFill,
-  BIconClipboardData,
-  BIconFullscreen,
-  BIconFullscreenExit,
-} from "bootstrap-icons-vue";
 
 const props = defineProps<PlayerProperties>();
 const container = ref<HTMLElement>();
@@ -260,9 +244,6 @@ const classes = computed(() => {
 });
 const volumeClasses = computed(() => {
   return { volume: true, "key-pressed": state.keyPressed };
-});
-const playlistURL = computed(() => {
-  return "/live/" + encodeURIComponent(props.ch.name) + ".m3u8";
 });
 
 // methods
