@@ -32,10 +32,8 @@ func (p *Path) Viewers() int {
 			others += 1
 		}
 	}
-	if rtsp > 0 {
-		// ignore thumbnailer
-		rtsp -= 1
-	}
+	// subtract the thumbnailer and transcoder
+	rtsp = max(0, rtsp-2)
 	return rtsp + others
 }
 

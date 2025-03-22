@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/rs/zerolog/hlog"
@@ -24,5 +25,5 @@ func (s *Server) viewPlaylist(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 	rw.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
-	fmt.Fprintf(rw, "rtsp://127.0.0.1:8554/%s\n", status.Name)
+	fmt.Fprintf(rw, "rtsp://127.0.0.1:8554/%s\n", url.PathEscape(status.Name))
 }

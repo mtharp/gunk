@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 	"net/url"
+	"strings"
 
 	"eaglesong.dev/gunk/internal/model"
 	"github.com/rs/zerolog"
@@ -33,6 +34,11 @@ func (s *Server) callbackAuth(rw http.ResponseWriter, req *http.Request) {
 	})
 	switch ar.Action {
 	case "publish":
+		if ar.IP == "127.0.0.1" && s.TcodePrefix != "" && strings.HasPrefix(ar.Path, s.TcodePrefix) {
+			// Allow transcoder to connect without auth
+			rw.WriteHeader(http.StatusNoContent)
+			return
+		}
 		vars, _ := url.ParseQuery(ar.Query)
 		password := ar.Password
 		if password == "" {

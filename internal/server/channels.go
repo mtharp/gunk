@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"time"
 
 	"eaglesong.dev/gunk/internal/model"
@@ -26,6 +27,7 @@ type channelEntry struct {
 type channelStatus struct {
 	Name    string
 	Viewers int
+	HasOpus bool
 }
 
 func (s *Server) getLivePaths(ctx context.Context) (map[string]channelStatus, error) {
@@ -42,6 +44,7 @@ func (s *Server) getLivePaths(ctx context.Context) (map[string]channelStatus, er
 		livePaths[p.Name] = channelStatus{
 			Name:    p.Name,
 			Viewers: p.Viewers() + hlsViews,
+			HasOpus: slices.Contains(p.Tracks, "Opus"),
 		}
 	}
 	return livePaths, nil
@@ -67,14 +70,18 @@ func (s *Server) viewChannels(rw http.ResponseWriter, req *http.Request) {
 	for _, ch := range modelChannels {
 		status := livePaths[ch.Name]
 		escaped := url.PathEscape(ch.Name)
+		withOpus := escaped
+		if !status.HasOpus {
+			withOpus = s.TcodePrefix + escaped
+		}
 		byName[ch.Name] = channelEntry{
 			ChannelInfo: *ch,
 			Live:        status.Name != "",
 			Viewers:     status.Viewers,
 			Thumb:       fmt.Sprintf("/thumbs/%s/%d.jpg", escaped, ch.Last),
-			WhepURL:     fmt.Sprintf("%s/whep/%s", s.BaseURL, escaped),
+			WhepURL:     fmt.Sprintf("%s/whep/%s", s.BaseURL, withOpus),
 			HlsURL:      fmt.Sprintf("%s/hls/%s/index.m3u8", s.AdvertiseHLS, escaped),
-			LiveURL:     fmt.Sprintf("%s/%s", s.AdvertiseRTSP, escaped),
+			LiveURL:     fmt.Sprintf("%s/%s", s.AdvertiseRTSP, withOpus),
 			PlaylistURL: "/live/" + escaped,
 		}
 		recent = append(recent, ch.Name)

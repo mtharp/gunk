@@ -22,6 +22,7 @@ type Server struct {
 	AdvertiseHLS  string
 	AdvertiseRTSP string
 	AdvertiseRTMP string
+	TcodePrefix   string
 	// webhook
 	Webhook *discord.Webhook
 	// proxies

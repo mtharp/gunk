@@ -72,6 +72,7 @@ func main() {
 		AdvertiseHLS:  hlsBaseURL,
 		AdvertiseRTMP: advertiseRTMP,
 		AdvertiseRTSP: advertiseRTSP,
+		TcodePrefix:   viper.GetString("transcoded_path_prefix"),
 		Model:         db,
 		MtxAPI:        mtx.API{BaseURL: viper.GetString("mtx_api")},
 	}

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"strings"
+	"regexp"
 
 	"eaglesong.dev/gunk/internal"
 	"github.com/jackc/pgerrcode"
@@ -69,8 +69,10 @@ func toChannel(row pgx.Row, name string) (*ChannelDef, error) {
 	return def, err
 }
 
+var validNameRe = regexp.MustCompile(`^[A-Za-z0-9 .,_-]+$`)
+
 func (d *db) CreateChannelDef(ctx context.Context, userID, name string) (*ChannelDef, error) {
-	if strings.ContainsRune(name, '/') {
+	if !validNameRe.MatchString(name) {
 		return nil, errors.New("invalid channel name")
 	}
 	key := internal.RandomID(24)

@@ -11,6 +11,7 @@ import (
 func (s *Server) SetHLS(u *url.URL) {
 	s.HLSProxy = &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
+			// remove /hls prefix
 			pr.Out.URL.Path = pr.In.URL.Path[4:]
 			pr.Out.Header.Del("X-Real-Ip")
 			pr.SetURL(u)
